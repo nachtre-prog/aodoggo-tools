@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小説用 自動字下げツール</title>
+    <style>
+        :root {
+            --bg-color: #f9f6f0; /* 古い紙のような暖色 */
+            --text-color: #3e3a35;
+            --box-bg: #ffffff;
+            --border-color: #d1c7b7;
+            --accent-color: #b56c60; /* 落ち着いた赤茶色 */
+            --accent-hover: #9c5c52;
+            --highlight-orange: #ffb74d;
+            --highlight-red: #ef5350;
+            --highlight-green: #81c784;
+            --highlight-blue: #64b5f6;
+            --highlight-purple: #ba68c8;
+        }
+
+        body {
+            font-family: "Yu Mincho", "MS Mincho", "Hiragino Mincho Pro", serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            color: var(--accent-color);
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 800px;
+            text-align: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .info-box {
+            background-color: var(--box-bg);
+            border: 1px dashed var(--border-color);
+            padding: 15px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        .info-list {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .legend {
+            margin-top: 10px;
+            font-size: 0.85rem;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .color-box {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+
+        .highlight-orange {
+            background-color: rgba(255, 183, 77, 0.4);
+            border-bottom: 2px solid var(--highlight-orange);
+        }
+
+        .highlight-red {
+            background-color: rgba(239, 83, 80, 0.4);
+            border-bottom: 2px solid var(--highlight-red);
+        }
+
+        .highlight-green {
+            background-color: rgba(129, 199, 132, 0.4);
+            border-bottom: 2px solid var(--highlight-green);
+        }
+
+        .highlight-blue {
+            background-color: rgba(100, 181, 246, 0.4);
+            border-bottom: 2px solid var(--highlight-blue);
+        }
+
+        .highlight-purple {
+            background-color: rgba(186, 104, 200, 0.4);
+            border-bottom: 2px solid var(--highlight-purple);
+        }
+
+        textarea, .editor {
+            width: 100%;
+            height: 250px;
+            padding: 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 1rem;
+            font-family: inherit;
+            resize: vertical;
+            background-color: var(--box-bg);
+            color: var(--text-color);
+            box-sizing: border-box;
+            white-space: pre-wrap;
+            overflow-y: auto;
+        }
+
+        textarea:focus, .editor:focus {
+            outline: 2px solid var(--accent-color);
+            border-color: transparent;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        button {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            font-size: 1rem;
+            font-family: inherit;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        button:hover:not(:disabled) {
+            background-color: var(--accent-hover);
+        }
+
+        button:active:not(:disabled) {
+            transform: scale(0.98);
+        }
+
+        button:disabled {
+            background-color: #d1c7b7;
+            color: #f9f6f0;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .button-secondary {
+            background-color: var(--border-color);
+            color: var(--text-color);
+        }
+
+        .button-secondary:hover:not(:disabled) {
+            background-color: #c1b5a4;
+        }
+
+        .button-fix {
+            background-color: #5d4037; /* こげ茶色 */
+        }
+
+        .button-fix:hover:not(:disabled) {
+            background-color: #4e342e;
+        }
+
+        label {
+            font-weight: bold;
+            margin-bottom: 5px;
+            display: block;
+            color: #6d6455;
+        }
+
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+            text-align: center;
+            font-size: 0.85rem;
+            color: #8c8273;
+            width: 100%;
+            max-width: 800px;
+        }
+
+        .download-container {
+            display: flex;
+            justify-content: flex-start;
+            width: 100%;
+            margin-top: -10px;
+        }
+
+        .button-download {
+            background: none;
+            border: none;
+            color: #b0a89d;
+            font-size: 0.8rem;
+            text-decoration: underline;
+            padding: 5px 10px;
+            cursor: pointer;
+            box-shadow: none;
+        }
+        
+        .button-download:hover {
+            color: #8c8273;
+            background: none;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>小説用 自動字下げツール</h1>
+
+    <div class="container">
+        <div class="info-box">
+            <ul class="info-list">
+                <li>行頭の空白をリセットし、段落の先頭に全角スペースを追加します（「」等の括弧から始まる行は除外）。</li>
+                <li>「！」や「？」の後に全角スペースがない場合、自動で追加します。</li>
+                <li>意図せぬ半角スペースやタブ文字が含まれていた場合、自動で除去します（英文間のスペースは保持）。</li>
+            </ul>
+            <div class="legend">
+                <strong>ハイライト凡例:</strong>
+                <div class="legend-item"><div class="color-box" style="background:var(--highlight-orange)"></div> 括弧末の句読点（意図的？）</div>
+                <div class="legend-item"><div class="color-box" style="background:var(--highlight-red)"></div> 奇数のダッシュ（偶数が基本）</div>
+                <div class="legend-item"><div class="color-box" style="background:var(--highlight-green)"></div> 連続する助詞（タイポ？）</div>
+                <div class="legend-item"><div class="color-box" style="background:var(--highlight-blue)"></div> 本文内の連続する全角空白（すべて修正で完全削除）</div>
+                <div class="legend-item"><div class="color-box" style="background:var(--highlight-purple)"></div> 連続する句読点</div>
+            </div>
+        </div>
+
+        <div>
+            <label for="inputText">元のテキスト（プレーンテキスト）を貼り付け</label>
+            <textarea id="inputText" placeholder="ここにテキストを入力してください..."></textarea>
+        </div>
+
+        <div class="controls">
+            <button type="button" id="convertBtn">字下げを実行</button>
+            <button type="button" id="fixBtn" class="button-fix" disabled>すべて修正</button>
+        </div>
+
+        <div>
+            <label for="outputText">変換後のテキスト（直接編集できます）</label>
+            <div id="outputText" class="editor" contenteditable="true"></div>
+        </div>
+
+        <div class="controls">
+            <button type="button" id="copyBtn" class="button-secondary">全文をコピー</button>
+        </div>
+
+        <div class="download-container">
+            <button type="button" id="downloadBtn" class="button-download">プレーンテキストとしてダウンロード</button>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>※本ツールの利用により生じたいかなる損害・トラブルについても、制作者は一切の責任を負いかねます。<br>念のため、大切な原稿は事前にバックアップを取った上でご利用ください。</p>
+        <p>Created on 2026/10/22 | 制作者: れっ＆リュシア</p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const inputText = document.getElementById('inputText');
+            const outputText = document.getElementById('outputText');
+            const convertBtn = document.getElementById('convertBtn');
+            const fixBtn = document.getElementById('fixBtn');
+            const copyBtn = document.getElementById('copyBtn');
+            const downloadBtn = document.getElementById('downloadBtn');
+
+            // 1. 除外括弧リスト
+            const excludeChars = ['「', '『', '（', '(', '〈', '《', '【', '〔', '［'];
+
+            // 2. 「字下げを実行」のテキスト処理ロジック
+            function processText(text) {
+                // 改行コードを \n に統一して行ごとに分割
+                const normalizedText = text.replace(/\r\n|\r/g, '\n');
+                const lines = normalizedText.split('\n');
+                const resultLines = [];
+
+                // 英数字・半角記号の判定用正規表現
+                const enRegex = /[a-zA-Z0-9.,!?'":;()[\]{}-]/;
+
+                for (let i = 0; i < lines.length; i++) {
+                    let line = lines[i];
+
+                    // 各行の先頭にある空白文字（半角スペース、全角スペース、タブ文字などすべて）を完全削除
+                    line = line.replace(/^[\s　]+/g, '');
+
+                    // 空行の場合はそのまま空行として返す
+                    if (line === '') {
+                        resultLines.push('');
+                        continue;
+                    }
+
+                    // 行内（本文中）にあるタブ文字（\t+）をすべて完全削除（全角スペース等に変換せず削除）
+                    line = line.replace(/\t+/g, '');
+
+                    // 行内（本文中）の半角スペースについて、前後が半角英数字・半角記号の場合のみ維持し、それ以外は完全削除
+                    line = line.replace(/ +/g, function(match, offset, string) {
+                        const prevChar = string.charAt(offset - 1);
+                        const nextChar = string.charAt(offset + match.length);
+                        if (prevChar && nextChar && enRegex.test(prevChar) && enRegex.test(nextChar)) {
+                            return match;
+                        }
+                        return '';
+                    });
+
+                    // タブや半角スペース削除後に空行になった場合の安全対策
+                    if (line === '') {
+                        resultLines.push('');
+                        continue;
+                    }
+
+                    // 行頭の1文字目が除外括弧リストに含まれない場合、行頭に全角スペースを1つ付与
+                    const firstChar = line.charAt(0);
+                    if (!excludeChars.includes(firstChar)) {
+                        line = '　' + line;
+                    }
+
+                    // 行内の「！」や「？」の直後に空白や閉じ括弧がなく、かつ行末でもない場合、直後に全角スペースを1つ追加
+                    line = line.replace(/([！？!?])(?![\s　」』）)】〕］]|$)/g, '$1　');
+
+                    resultLines.push(line);
+                }
+
+                return resultLines.join('\n');
+            }
+
+            // HTMLエスケープ処理
+            function escapeHTML(str) {
+                return str.replace(/[&<>'"]/g, function(tag) {
+                    const charsToReplace = {
+                        '&': '&amp;',
+                        '<': '&lt;',
+                        '>': '&gt;',
+                        "'": '&#39;',
+                        '"': '&quot;'
+                    };
+                    return charsToReplace[tag] || tag;
+                });
+            }
+
+            // 3. ハイライト処理（必ずHTMLエスケープ後に実行）
+            function applyHighlight(escapedText) {
+                let html = escapedText;
+
+                // オレンジ：括弧末の句読点
+                html = html.replace(/([。、])([」』）)】〕］])/g, '<span class="highlight-orange">$1</span>$2');
+
+                // 赤：奇数のダッシュ
+                html = html.replace(/(?<!―)(―+)(?!―)/g, function(match) {
+                    if (match.length % 2 !== 0) {
+                        return `<span class="highlight-red">${match}</span>`;
+                    }
+                    return match;
+                });
+
+                // 紫：連続する句読点
+                html = html.replace(/(。{2,}|、{2,})/g, '<span class="highlight-purple">$1</span>');
+
+                // 緑：連続する助詞
+                const joshiRegex = /(がが|をを|にに|はは(?!は)|へへ|とと(?!と)|よりより|からから)/g;
+                html = html.replace(joshiRegex, '<span class="highlight-green">$1</span>');
+
+                // 青：連続する全角空白
+                html = html.replace(/(　{2,})/g, '<span class="highlight-blue">$1</span>');
+
+                return html;
+            }
+
+            // 4. 「すべて修正」処理ロジック
+            function autoFix(text) {
+                // 改行コードを統一
+                let fixed = text.replace(/\r\n|\r/g, '\n');
+
+                // 括弧末尾の句読点を削除
+                fixed = fixed.replace(/([。、])([」』）)】〕］])/g, '$2');
+
+                // 奇数のダッシュを修正（1または3なら2つに、5以上の奇数なら1つ足して偶数に）
+                fixed = fixed.replace(/(?<!―)(―+)(?!―)/g, function(match) {
+                    const len = match.length;
+                    if (len % 2 !== 0) {
+                        if (len === 1 || len === 3) {
+                            return '――';
+                        }
+                        return match + '―';
+                    }
+                    return match;
+                });
+
+                // 連続する句読点を1つに
+                fixed = fixed.replace(/(。{2,}|、{2,})/g, function(match) {
+                    return match.charAt(0);
+                });
+
+                // 連続する助詞を1つに短縮
+                const joshiRegex = /(がが|をを|にに|はは(?!は)|へへ|とと(?!と)|よりより|からから)/g;
+                fixed = fixed.replace(joshiRegex, function(match) {
+                    return match.substring(0, match.length / 2);
+                });
+
+                // 各行ごとに処理し、本文内の連続する全角空白・タブを完全削除
+                const lines = fixed.split('\n');
+                const fixedLines = lines.map(line => {
+                    // タブ文字（\t+）を完全削除
+                    let cleanedLine = line.replace(/\t+/g, '');
+
+                    // 万が一行頭に連続全角スペース（^　{2,}）がある場合は行頭字下げとして '　' 1つに残し、
+                    // 行頭以外の本文中にある連続全角スペース（　{2,}）は ''（空文字）に置換して完全削除
+                    cleanedLine = cleanedLine.replace(/　{2,}/g, function(match, offset) {
+                        return offset === 0 ? '　' : '';
+                    });
+
+                    return cleanedLine;
+                });
+
+                return fixedLines.join('\n');
+            }
+
+            // 画面への反映ヘルパー（エスケープ＋ハイライト＋<br>変換）
+            function renderOutput(plainText) {
+                const escapedText = escapeHTML(plainText);
+                const highlightedHTML = applyHighlight(escapedText);
+                outputText.innerHTML = highlightedHTML.replace(/\n/g, '<br>');
+            }
+
+            // 「字下げを実行」ボタンのイベント
+            convertBtn.addEventListener('click', () => {
+                const rawText = inputText.value;
+                if (!rawText) return;
+
+                const processedText = processText(rawText);
+                renderOutput(processedText);
+                
+                // 変換が実行されたら「すべて修正」ボタンを有効化する
+                fixBtn.disabled = false;
+            });
+
+            // 「すべて修正」ボタンのイベント
+            fixBtn.addEventListener('click', () => {
+                const currentText = outputText.innerText;
+                if (!currentText) return;
+
+                const fixedText = autoFix(currentText);
+                renderOutput(fixedText);
+            });
+
+            // コピー成功時のフィードバック表示
+            function showCopyFeedback() {
+                const originalText = copyBtn.textContent;
+                copyBtn.textContent = 'コピーしました！';
+                copyBtn.style.backgroundColor = 'var(--highlight-green)';
+                copyBtn.style.color = '#3e3a35';
+
+                setTimeout(() => {
+                    copyBtn.textContent = originalText;
+                    copyBtn.style.backgroundColor = '';
+                    copyBtn.style.color = '';
+                }, 2000);
+            }
+
+            // フォールバック用コピー処理（スクロールジャンプ防止）
+            function fallbackCopy(text) {
+                const tempTextArea = document.createElement('textarea');
+                tempTextArea.value = text;
+                tempTextArea.style.position = 'fixed';
+                tempTextArea.style.top = '0';
+                tempTextArea.style.left = '0';
+                tempTextArea.style.opacity = '0';
+                tempTextArea.style.pointerEvents = 'none';
+                document.body.appendChild(tempTextArea);
+
+                tempTextArea.focus();
+                tempTextArea.select();
+
+                try {
+                    const successful = document.execCommand('copy');
+                    if (successful) {
+                        showCopyFeedback();
+                    }
+                } catch (err) {
+                    console.error('コピーに失敗しました:', err);
+                } finally {
+                    document.body.removeChild(tempTextArea);
+                }
+            }
+
+            // 5. 「全文をコピー」ボタンのイベント
+            copyBtn.addEventListener('click', () => {
+                const textToCopy = outputText.innerText;
+                if (!textToCopy) return;
+
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(textToCopy).then(() => {
+                        showCopyFeedback();
+                    }).catch(() => {
+                        fallbackCopy(textToCopy);
+                    });
+                } else {
+                    fallbackCopy(textToCopy);
+                }
+            });
+
+            // 6. 「テキストとしてダウンロード」ボタンのイベント
+            downloadBtn.addEventListener('click', () => {
+                const textToDownload = outputText.innerText;
+                if (!textToDownload) return;
+
+                const blob = new Blob([textToDownload], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'novel_formatted.txt';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+
+            // 入力テキストが変更（空に）なったらボタンを再度無効化する処理
+            inputText.addEventListener('input', () => {
+                if(inputText.value.trim() === '') {
+                    fixBtn.disabled = true;
+                }
+            });
+        });
+    </script>
+</body>
+</html>
