@@ -198,8 +198,13 @@
             max-width: 800px;
         }
 
+        .footer p {
+            margin: 5px 0;
+            line-height: 1.5;
+        }
+
         .footer-links {
-            margin-top: 10px;
+            margin-top: 15px;
             font-size: 0.8rem;
         }
 
@@ -246,7 +251,7 @@
 
         <div>
             <label for="outputText">変換後のテキスト（直接編集できます）</label>
-            <div id="outputText" class="editor" contenteditable="true"></div>
+            <div id="outputText" class="editor" contenteditable="true"><br></div>
         </div>
 
         <div class="controls">
@@ -259,7 +264,9 @@
     </div>
 
     <footer class="footer">
-        <p>※web上で完結するツールのため、送信したデータの内容はサーバーなどには保存されません。<br/>本ツールを使用したことによるデータの破損や損失等について、制作者は一切の責任を負いかねます。<br/>大切な原稿は必ずバックアップを取ってからご利用ください。</p>
+        <p>※web上で完結するツールのため、送信したデータの内容はサーバーなどには保存されません。<br/>
+        本ツールを使用したことによるデータの破損や損失等について、制作者は一切の責任を負いかねます。<br/>
+        大切な原稿は必ずバックアップを取ってからご利用ください。</p>
         <div class="footer-links">
             制作者: れっ＆リュシア <a href="https://x.com/fried_more" target="_blank" rel="noopener noreferrer">@fried_more</a>
         </div>
@@ -313,7 +320,8 @@
                     }
 
                     // 「！」「？」「！？」「？！」等の後に全角スペースを追加
-                    line = line.replace(/([！？!?]+)(?![\s　」』）)】〕］]|$)/g, '$1　');
+                    // 否定先読み [！？!?] を追加し、バックトラッキングによる記号間の分離を防止
+                    line = line.replace(/([！？!?]+)(?![\s　」』）)】〕］！？!?]|$)/g, '$1　');
 
                     resultLines.push(line);
                 }
