@@ -196,6 +196,16 @@
             width: 100%;
             max-width: 800px;
         }
+        
+        .footer a {
+            color: var(--accent-color);
+            text-decoration: none;
+            font-weight: bold;
+        }
+        
+        .footer a:hover {
+            text-decoration: underline;
+        }
 
         .download-container {
             display: flex;
@@ -229,15 +239,15 @@
         <div class="info-box">
             <ul class="info-list">
                 <li>行頭の空白をリセットし、段落の先頭に全角スペースを追加します（「」等の括弧から始まる行は除外）。</li>
-                <li>「！」や「？」の後に全角スペースがない場合、自動で追加します。</li>
+                <li>「！」「？」「！？」「？！」の後に全角スペースがない場合、自動で追加します。</li>
                 <li>意図せぬ半角スペースやタブ文字が含まれていた場合、自動で除去します（英文間のスペースは保持）。</li>
             </ul>
             <div class="legend">
                 <strong>ハイライト凡例:</strong>
-                <div class="legend-item"><div class="color-box" style="background:var(--highlight-orange)"></div> 括弧末の句読点（意図的？）</div>
-                <div class="legend-item"><div class="color-box" style="background:var(--highlight-red)"></div> 奇数のダッシュ（偶数が基本）</div>
+                <div class="legend-item"><div class="color-box" style="background:var(--highlight-orange)"></div> 括弧前の句読点（意図的？）</div>
+                <div class="legend-item"><div class="color-box" style="background:var(--highlight-red)"></div> 奇数のダッシュ・三点リーダー</div>
                 <div class="legend-item"><div class="color-box" style="background:var(--highlight-green)"></div> 連続する助詞（タイポ？）</div>
-                <div class="legend-item"><div class="color-box" style="background:var(--highlight-blue)"></div> 本文内の連続する全角空白（すべて修正で完全削除）</div>
+                <div class="legend-item"><div class="color-box" style="background:var(--highlight-blue)"></div> 連続する全角空白（すべて修正で完全削除）</div>
                 <div class="legend-item"><div class="color-box" style="background:var(--highlight-purple)"></div> 連続する句読点</div>
             </div>
         </div>
@@ -268,7 +278,7 @@
 
     <footer class="footer">
         <p>※本ツールの利用により生じたいかなる損害・トラブルについても、制作者は一切の責任を負いかねます。<br>念のため、大切な原稿は事前にバックアップを取った上でご利用ください。</p>
-        <p>Created on 2026/10/22 | 制作者: れっ＆リュシア</p>
+        <p>Created on 2026/10/22 | 制作者: れっ＆リュシア <a href="https://x.com/fried_more" target="_blank" rel="noopener noreferrer">@fried_more</a></p>
     </footer>
 
     <script>
@@ -280,10 +290,10 @@
             const copyBtn = document.getElementById('copyBtn');
             const downloadBtn = document.getElementById('downloadBtn');
 
-            // 1. 除外括弧リスト
+            // 除外括弧リスト
             const excludeChars = ['「', '『', '（', '(', '〈', '《', '【', '〔', '［'];
 
-            // 2. 「字下げを実行」のテキスト処理ロジック
+            // テキスト処理ロジック（字下げ・スペースの正規化）
             function processText(text) {
                 // 改行コードを \n に統一して行ごとに分割
                 const normalizedText = text.replace(/\r\n|\r/g, '\n');
@@ -296,16 +306,15 @@
                 for (let i = 0; i < lines.length; i++) {
                     let line = lines[i];
 
-                    // 各行の先頭にある空白文字（半角スペース、全角スペース、タブ文字などすべて）を完全削除
+                    // 各行の先頭にある空白文字を完全削除
                     line = line.replace(/^[\s　]+/g, '');
 
-                    // 空行の場合はそのまま空行として返す
                     if (line === '') {
                         resultLines.push('');
                         continue;
                     }
 
-                    // 行内（本文中）にあるタブ文字（\t+）をすべて完全削除（全角スペース等に変換せず削除）
+                    // 行内（本文中）のタブ文字（\t+）をすべて完全削除
                     line = line.replace(/\t+/g, '');
 
                     // 行内（本文中）の半角スペースについて、前後が半角英数字・半角記号の場合のみ維持し、それ以外は完全削除
@@ -318,20 +327,21 @@
                         return '';
                     });
 
-                    // タブや半角スペース削除後に空行になった場合の安全対策
                     if (line === '') {
                         resultLines.push('');
                         continue;
                     }
 
-                    // 行頭の1文字目が除外括弧リストに含まれない場合、行頭に全角スペースを1つ付与
+                    // 括弧から始まらない場合は全角スペースを追加
                     const firstChar = line.charAt(0);
                     if (!excludeChars.includes(firstChar)) {
                         line = '　' + line;
                     }
 
-                    // 行内の「！」や「？」の直後に空白や閉じ括弧がなく、かつ行末でもない場合、直後に全角スペースを1つ追加
-                    line = line.replace(/([！？!?])(?![\s　」』）)】〕］]|$)/g, '$1　');
+                    // 【修正箇所】「！」「？」「！？」「？！」の塊の後ろに全角スペースを追加。
+                    // ＋記号を使うことで連続した記号をひとまとめに判定し、間にスペースが入るのを防ぎます。
+                    // 行末（$）や括弧前の場合は追加しません。
+                    line = line.replace(/([！？!?]+)(?![\s　」』）)】〕］]|$)/g, '$1　');
 
                     resultLines.push(line);
                 }
@@ -353,16 +363,16 @@
                 });
             }
 
-            // 3. ハイライト処理（必ずHTMLエスケープ後に実行）
+            // ハイライト処理（HTMLエスケープ後に実行）
             function applyHighlight(escapedText) {
                 let html = escapedText;
 
-                // オレンジ：括弧末の句読点
+                // オレンジ：括弧前の句読点
                 html = html.replace(/([。、])([」』）)】〕］])/g, '<span class="highlight-orange">$1</span>$2');
 
-                // 赤：奇数のダッシュ
-                html = html.replace(/(?<!―)(―+)(?!―)/g, function(match) {
-                    if (match.length % 2 !== 0) {
+                // 赤：奇数のダッシュ・三点リーダー
+                html = html.replace(/(?<!―)(―+)(?!―)|(?<!…)(…+)(?!…)/g, function(match) {
+                    if (match && match.length % 2 !== 0) {
                         return `<span class="highlight-red">${match}</span>`;
                     }
                     return match;
@@ -371,7 +381,7 @@
                 // 紫：連続する句読点
                 html = html.replace(/(。{2,}|、{2,})/g, '<span class="highlight-purple">$1</span>');
 
-                // 緑：連続する助詞
+                // 緑：連続する助詞（ののは除外）
                 const joshiRegex = /(がが|をを|にに|はは(?!は)|へへ|とと(?!と)|よりより|からから)/g;
                 html = html.replace(joshiRegex, '<span class="highlight-green">$1</span>');
 
@@ -381,22 +391,23 @@
                 return html;
             }
 
-            // 4. 「すべて修正」処理ロジック
+            // 「すべて修正」の一括処理ロジック
             function autoFix(text) {
-                // 改行コードを統一
                 let fixed = text.replace(/\r\n|\r/g, '\n');
 
-                // 括弧末尾の句読点を削除
+                // 括弧前の句読点を削除
                 fixed = fixed.replace(/([。、])([」』）)】〕］])/g, '$2');
 
-                // 奇数のダッシュを修正（1または3なら2つに、5以上の奇数なら1つ足して偶数に）
-                fixed = fixed.replace(/(?<!―)(―+)(?!―)/g, function(match) {
+                // 奇数のダッシュ・三点リーダーを修正
+                fixed = fixed.replace(/(?<!―)(―+)(?!―)|(?<!…)(…+)(?!…)/g, function(match) {
+                    if (!match) return match;
                     const len = match.length;
+                    const char = match.charAt(0); // '―' か '…'
                     if (len % 2 !== 0) {
                         if (len === 1 || len === 3) {
-                            return '――';
+                            return char + char; // 1個・3個は2個に修正
                         }
-                        return match + '―';
+                        return match + char;    // 5個以上の奇数は1個足して偶数に
                     }
                     return match;
                 });
@@ -412,32 +423,27 @@
                     return match.substring(0, match.length / 2);
                 });
 
-                // 各行ごとに処理し、本文内の連続する全角空白・タブを完全削除
+                // 本文内の連続全角空白・タブを完全削除
                 const lines = fixed.split('\n');
                 const fixedLines = lines.map(line => {
-                    // タブ文字（\t+）を完全削除
                     let cleanedLine = line.replace(/\t+/g, '');
-
-                    // 万が一行頭に連続全角スペース（^　{2,}）がある場合は行頭字下げとして '　' 1つに残し、
-                    // 行頭以外の本文中にある連続全角スペース（　{2,}）は ''（空文字）に置換して完全削除
                     cleanedLine = cleanedLine.replace(/　{2,}/g, function(match, offset) {
-                        return offset === 0 ? '　' : '';
+                        return offset === 0 ? '　' : ''; // 行頭のインデントだけは1つ残す
                     });
-
                     return cleanedLine;
                 });
 
                 return fixedLines.join('\n');
             }
 
-            // 画面への反映ヘルパー（エスケープ＋ハイライト＋<br>変換）
+            // 出力画面への反映（エスケープ＋ハイライト）
             function renderOutput(plainText) {
                 const escapedText = escapeHTML(plainText);
                 const highlightedHTML = applyHighlight(escapedText);
                 outputText.innerHTML = highlightedHTML.replace(/\n/g, '<br>');
             }
 
-            // 「字下げを実行」ボタンのイベント
+            // 「字下げを実行」
             convertBtn.addEventListener('click', () => {
                 const rawText = inputText.value;
                 if (!rawText) return;
@@ -445,11 +451,11 @@
                 const processedText = processText(rawText);
                 renderOutput(processedText);
                 
-                // 変換が実行されたら「すべて修正」ボタンを有効化する
+                // 実行後に「すべて修正」ボタンを有効化
                 fixBtn.disabled = false;
             });
 
-            // 「すべて修正」ボタンのイベント
+            // 「すべて修正」
             fixBtn.addEventListener('click', () => {
                 const currentText = outputText.innerText;
                 if (!currentText) return;
@@ -458,7 +464,7 @@
                 renderOutput(fixedText);
             });
 
-            // コピー成功時のフィードバック表示
+            // コピー処理のフィードバック
             function showCopyFeedback() {
                 const originalText = copyBtn.textContent;
                 copyBtn.textContent = 'コピーしました！';
@@ -472,7 +478,7 @@
                 }, 2000);
             }
 
-            // フォールバック用コピー処理（スクロールジャンプ防止）
+            // コピー処理フォールバック
             function fallbackCopy(text) {
                 const tempTextArea = document.createElement('textarea');
                 tempTextArea.value = text;
@@ -488,17 +494,15 @@
 
                 try {
                     const successful = document.execCommand('copy');
-                    if (successful) {
-                        showCopyFeedback();
-                    }
+                    if (successful) showCopyFeedback();
                 } catch (err) {
-                    console.error('コピーに失敗しました:', err);
+                    console.error('コピー失敗:', err);
                 } finally {
                     document.body.removeChild(tempTextArea);
                 }
             }
 
-            // 5. 「全文をコピー」ボタンのイベント
+            // 「全文をコピー」
             copyBtn.addEventListener('click', () => {
                 const textToCopy = outputText.innerText;
                 if (!textToCopy) return;
@@ -506,15 +510,13 @@
                 if (navigator.clipboard && navigator.clipboard.writeText) {
                     navigator.clipboard.writeText(textToCopy).then(() => {
                         showCopyFeedback();
-                    }).catch(() => {
-                        fallbackCopy(textToCopy);
-                    });
+                    }).catch(() => fallbackCopy(textToCopy));
                 } else {
                     fallbackCopy(textToCopy);
                 }
             });
 
-            // 6. 「テキストとしてダウンロード」ボタンのイベント
+            // 「プレーンテキストとしてダウンロード」
             downloadBtn.addEventListener('click', () => {
                 const textToDownload = outputText.innerText;
                 if (!textToDownload) return;
@@ -530,7 +532,7 @@
                 URL.revokeObjectURL(url);
             });
 
-            // 入力テキストが変更（空に）なったらボタンを再度無効化する処理
+            // 入力が空になったら「すべて修正」を無効化
             inputText.addEventListener('input', () => {
                 if(inputText.value.trim() === '') {
                     fixBtn.disabled = true;
