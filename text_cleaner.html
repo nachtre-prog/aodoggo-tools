@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>テキスト整形・プレーン化ツール</title>
+    <style>
+        :root {
+            --bg-color: #f9f6f0;
+            --text-color: #3e3a35;
+            --box-bg: #ffffff;
+            --border-color: #d1c7b7;
+            --accent-color: #b56c60;
+            --accent-hover: #9c5c52;
+            --highlight-green: #81c784;
+            --sub-color: #6d6455;
+            --sub-light: #8c8273;
+        }
+
+        body {
+            font-family: "Yu Mincho", "MS Mincho", "Hiragino Mincho Pro", serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            color: var(--accent-color);
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 900px;
+            text-align: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .info-box {
+            background-color: var(--box-bg);
+            border: 1px dashed var(--border-color);
+            padding: 15px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        .info-list {
+            margin: 0;
+            padding-left: 20px;
+        }
+        
+        .info-note {
+            color: #d32f2f;
+            font-size: 0.8rem;
+            margin-top: 8px;
+            margin-bottom: 0;
+        }
+
+        .options-container {
+            background-color: var(--box-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 15px 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px 25px;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            color: var(--text-color);
+            user-select: none;
+            margin-bottom: 0;
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            accent-color: var(--accent-color);
+            width: 17px;
+            height: 17px;
+            cursor: pointer;
+        }
+
+        .workspace {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .workspace {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .editor-column {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            font-weight: bold;
+            color: var(--sub-color);
+            font-size: 0.95rem;
+        }
+
+        textarea {
+            width: 100%;
+            height: 380px;
+            padding: 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            resize: vertical;
+            background-color: var(--box-bg);
+            color: var(--text-color);
+            box-sizing: border-box;
+            line-height: 1.6;
+        }
+
+        textarea:focus {
+            outline: 2px solid var(--accent-color);
+            border-color: transparent;
+        }
+
+        .counter-badge {
+            font-size: 0.85rem;
+            color: var(--sub-light);
+            display: flex;
+            gap: 12px;
+            background-color: rgba(209, 199, 183, 0.2);
+            padding: 6px 12px;
+            border-radius: 4px;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            font-size: 1rem;
+            font-family: inherit;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        button:hover {
+            background-color: var(--accent-hover);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .button-secondary {
+            background-color: var(--border-color);
+            color: var(--text-color);
+        }
+
+        .button-secondary:hover {
+            background-color: #c1b5a4;
+        }
+
+        .dl-container {
+            display: flex;
+            justify-content: flex-start;
+            margin-top: 10px;
+        }
+
+        .button-dl {
+            background: none;
+            border: none;
+            color: var(--sub-light);
+            text-decoration: underline;
+            font-size: 0.85rem;
+            padding: 5px;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .button-dl:hover {
+            color: var(--accent-color);
+        }
+
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--sub-light);
+            width: 100%;
+            max-width: 900px;
+        }
+
+        .footer p {
+            margin: 5px 0;
+        }
+
+        .footer a {
+            color: var(--accent-color);
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>テキスト整形・プレーン化ツール</h1>
+
+    <div class="container">
+        <div class="info-box">
+            <ul class="info-list">
+                <li>連続空行や過剰な改行をすっきり圧縮（または完全削除）します。</li>
+                <li>全角スペースや見えない空白を削除しつつ、英単語間の半角スペースはしっかり保護。</li>
+                <li>荒ぶる句読点（！！？？、。。。。等）や不要な注釈番号もオプションで一網打尽にできます。</li>
+                <li>Markdownの完全滅殺をオンにすると、関連記号（* _ # ` > ~ | -- 等）を<strong>問答無用で文中からすべて削除</strong>します（中黒「・」や丸数字は保護されます）。</li>
+            </ul>
+            <p class="info-note">※Markdown除去を有効にすると、文脈上の「-」や「+」、番号付きリストのような形式が意図せず消去される（巻き添え）可能性があります。ご注意ください。</p>
+        </div>
+
+        <div class="options-container">
+            <label class="checkbox-label"><input type="checkbox" id="optTrim" checked> 行頭・行末の空白を削除</label>
+            <label class="checkbox-label"><input type="checkbox" id="optRemoveSpaces" checked> 文中の不要な空白を削除（英字間保持）</label>
+            <label class="checkbox-label"><input type="checkbox" id="optCompressLines" checked> 連続する空行を1行に圧縮</label>
+            <label class="checkbox-label"><input type="checkbox" id="optRemoveEmptyLines"> 空行を完全に削除（圧縮より優先）</label>
+            <label class="checkbox-label"><input type="checkbox" id="optFixPunctuation"> 荒ぶる句読点・記号を整理</label>
+            <label class="checkbox-label"><input type="checkbox" id="optRemoveAnnotations"> 注釈番号（[1], [a]等）を削除</label>
+            <label class="checkbox-label"><input type="checkbox" id="optRemoveMarkdown"> Markdown記号を完全滅殺（無差別）</label>
+        </div>
+
+        <div class="workspace">
+            <div class="editor-column">
+                <label for="inputText">変換元のテキスト</label>
+                <textarea id="inputText" placeholder="ここに元の文章を貼り付けてください..."></textarea>
+                <div class="counter-badge" id="inCounter">
+                    <span>文字数(全): 0</span><span>文字数(除): 0</span><span>行数: 0</span>
+                </div>
+            </div>
+
+            <div class="editor-column">
+                <label for="outputText">整形後のテキスト（直接編集可能）</label>
+                <textarea id="outputText" placeholder="整形結果がリアルタイムで反映されます..."></textarea>
+                <div class="counter-badge" id="outCounter">
+                    <span>文字数(全): 0</span><span>文字数(除): 0</span><span>行数: 0</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button type="button" id="copyBtn" class="button-secondary">全文をコピー</button>
+            <button type="button" id="clearBtn" class="button-secondary">クリア</button>
+        </div>
+
+        <div class="dl-container">
+            <button type="button" id="downloadBtn" class="button-dl">整形後のテキストデータをダウンロード (.txt)</button>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>※Web上で完結するツールのため、送信したデータの内容はサーバーなどには保存されません。<br/>本ツールを使用したことによるデータの破損や損失等について、制作者は一切の責任を負いかねます。<br/>大切な原稿は必ずバックアップを取ってからご利用ください。</p>
+        <p>Created on 2026/10/24 | 制作者: れっ＆リュシア (<a href="https://x.com/fried_more" target="_blank" rel="noopener noreferrer">@fried_more</a>)</p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const inputText = document.getElementById('inputText');
+            const outputText = document.getElementById('outputText');
+            const inCounter = document.getElementById('inCounter');
+            const outCounter = document.getElementById('outCounter');
+            const copyBtn = document.getElementById('copyBtn');
+            const clearBtn = document.getElementById('clearBtn');
+            const downloadBtn = document.getElementById('downloadBtn');
+
+            const checkboxes = {
+                trim: document.getElementById('optTrim'),
+                removeSpaces: document.getElementById('optRemoveSpaces'),
+                compressLines: document.getElementById('optCompressLines'),
+                removeEmptyLines: document.getElementById('optRemoveEmptyLines'),
+                fixPunctuation: document.getElementById('optFixPunctuation'),
+                removeAnnotations: document.getElementById('optRemoveAnnotations'),
+                removeMarkdown: document.getElementById('optRemoveMarkdown')
+            };
+
+            // LocalStorageから設定を復元
+            Object.keys(checkboxes).forEach(key => {
+                const saved = localStorage.getItem(`cleaner_opt_${key}`);
+                if (saved !== null) checkboxes[key].checked = (saved === 'true');
+                checkboxes[key].addEventListener('change', () => {
+                    localStorage.setItem(`cleaner_opt_${key}`, checkboxes[key].checked);
+                    runTransform();
+                });
+            });
+
+            function updateCounter(text, badgeElem) {
+                const totalChars = text.length;
+                // NBSP（見えない空白）も含めて文字数カウントから除外
+                const noSpaceChars = text.replace(/[\s\u3000\xA0]/g, '').length;
+                const lines = text === '' ? 0 : text.split('\n').length;
+                badgeElem.children[0].textContent = `文字数(全): ${totalChars.toLocaleString()}`;
+                badgeElem.children[1].textContent = `文字数(除): ${noSpaceChars.toLocaleString()}`;
+                badgeElem.children[2].textContent = `行数: ${lines.toLocaleString()}`;
+            }
+
+            function stripMarkdown(text) {
+                let md = text;
+                
+                // 0. コードブロックのフェンス行（```javascript 等）を除去し中身だけ残す
+                md = md.replace(/^[ \t\u3000\xA0]*`{3,}[a-zA-Z0-9_\-]*[ \t\u3000\xA0]*$/gm, '');
+
+                // 1. 画像とリンクの処理（注釈削除やリスト処理より先に実行して共食いを防ぐ）
+                md = md.replace(/!\[.*?\]\(.*?\)/g, ''); // 画像は完全削除
+                md = md.replace(/\[(.*?)\]\(.*?\)/g, '$1'); // リンクはテキストのみ残す
+                
+                // 2. 水平線・区切り線などの連続記号（箇条書き処理より先に実行して「--」の生き残りを防ぐ！）
+                md = md.replace(/[-=]{2,}/g, ''); // 2つ以上連続する - や = を完全削除
+
+                // 3. タスクリスト（- [ ] や - [x] など）
+                md = md.replace(/^[ \t\u3000\xA0]*[\*\-+][ \t\u3000\xA0]*\[[ xX]?\][ \t\u3000\xA0]*/gm, '');
+
+                // 4. 見出し・引用（行頭にある記号と直後の空白をセットで消す）
+                md = md.replace(/^[ \t\u3000\xA0]*#{1,6}[ \t\u3000\xA0]*/gm, '');
+                md = md.replace(/^[ \t\u3000\xA0]*>+[ \t\u3000\xA0]*/gm, '');
+                
+                // 5. リスト系の記号（行頭のもの：前に空白があっても、後ろに空白がなくても滅殺）
+                // ※中黒（・）や丸数字（①など）は対象外としてしっかり保護！
+                md = md.replace(/^[ \t\u3000\xA0]*[\-+][ \t\u3000\xA0]*/gm, ''); // 箇条書き（- や +）
+                md = md.replace(/^[ \t\u3000\xA0]*\d+\.[ \t\u3000\xA0]*/gm, ''); // 番号付きリスト（1. 等）
+                
+                // 6. 絶対に許さない単体記号たちを完全無差別滅殺
+                // * _ # ` > ~ | を文中のどこにあっても問答無用で削除
+                md = md.replace(/[*_#`~>|]/g, '');
+                
+                return md;
+            }
+            
+            function transform(rawText) {
+                if (!rawText) return '';
+                let text = rawText;
+
+                // ① Markdownの完全滅殺（リンクの共食いを防ぐため最優先で実行）
+                if (checkboxes.removeMarkdown.checked) {
+                    text = stripMarkdown(text);
+                }
+
+                // ② 注釈番号の削除（全角カッコや【】にも対応）
+                if (checkboxes.removeAnnotations.checked) {
+                    text = text.replace(/[\[［【][a-zA-Z0-9ａ-ｚＡ-Ｚ０-９,，\s\u3000\xA0\-注]+[\]］】]/g, '');
+                }
+
+                // ③ 荒ぶる句読点・記号の整理（連続ダッシュ対応、単体の「・」は保護）
+                if (checkboxes.fixPunctuation.checked) {
+                    text = text.replace(/[。]{2,}/g, '。');
+                    text = text.replace(/[、]{2,}/g, '、');
+                    text = text.replace(/[・]{2,}/g, '・');
+                    text = text.replace(/[―─－]{2,}/g, '―');
+                    text = text.replace(/[！!？?]{2,}/g, (match) => {
+                        let hasBang = /[！!]/.test(match);
+                        let hasQ = /[？?]/.test(match);
+                        if (hasBang && hasQ) return '！？';
+                        if (hasBang) return '！';
+                        if (hasQ) return '？';
+                        return match;
+                    });
+                }
+
+                let lines = text.split('\n');
+                let processedLines = [];
+
+                // ④ 各行の空白トリム・文中スペース削除
+                for (let i = 0; i < lines.length; i++) {
+                    let line = lines[i];
+                    // 見えない空白（\xA0等）も含めて行頭・行末トリム
+                    if (checkboxes.trim.checked) {
+                        line = line.replace(/^[\s\u3000\xA0]+|[\s\u3000\xA0]+$/g, '');
+                    }
+                    // 文中の不要な空白削除（英字間は半角スペース1つに保護）
+                    if (checkboxes.removeSpaces.checked) {
+                        line = line.replace(/[ \t\u3000\xA0]+/g, function(match, offset, string) {
+                            const prevChar = string.charAt(offset - 1);
+                            const nextChar = string.charAt(offset + match.length);
+                            const enRegex = /[a-zA-Z0-9.,!?'":;()[\]{}\-]/;
+                            if (prevChar && nextChar && enRegex.test(prevChar) && enRegex.test(nextChar)) {
+                                return ' '; 
+                            }
+                            return '';
+                        });
+                    }
+                    processedLines.push(line);
+                }
+
+                // ⑤ 空行の処理（完全削除は圧縮より優先）
+                if (checkboxes.removeEmptyLines.checked) {
+                    processedLines = processedLines.filter(line => line !== '');
+                } else if (checkboxes.compressLines.checked) {
+                    let compressed = [];
+                    let emptyCount = 0;
+                    for (let line of processedLines) {
+                        if (line === '') {
+                            emptyCount++;
+                            if (emptyCount <= 1) compressed.push(line);
+                        } else {
+                            emptyCount = 0;
+                            compressed.push(line);
+                        }
+                    }
+                    processedLines = compressed;
+                }
+
+                return processedLines.join('\n');
+            }
+
+            function runTransform() {
+                const source = inputText.value;
+                const result = transform(source);
+                outputText.value = result;
+                updateCounter(source, inCounter);
+                updateCounter(result, outCounter);
+            }
+
+            inputText.addEventListener('input', runTransform);
+            outputText.addEventListener('input', () => updateCounter(outputText.value, outCounter));
+
+            copyBtn.addEventListener('click', () => {
+                const text = outputText.value;
+                if (!text) return;
+                navigator.clipboard.writeText(text).then(() => {
+                    const originalText = copyBtn.textContent;
+                    copyBtn.textContent = 'コピーしました！';
+                    copyBtn.style.backgroundColor = 'var(--highlight-green)';
+                    copyBtn.style.color = '#3e3a35';
+                    setTimeout(() => {
+                        copyBtn.textContent = originalText;
+                        copyBtn.style.backgroundColor = '';
+                        copyBtn.style.color = '';
+                    }, 2000);
+                }).catch(() => alert('コピーに失敗しました。'));
+            });
+
+            clearBtn.addEventListener('click', () => {
+                if (!inputText.value && !outputText.value) return;
+                if (confirm('テキストを消去してもよろしいですか？')) {
+                    inputText.value = '';
+                    outputText.value = '';
+                    updateCounter('', inCounter);
+                    updateCounter('', outCounter);
+                }
+            });
+
+            downloadBtn.addEventListener('click', () => {
+                const text = outputText.value;
+                if (!text) {
+                    alert('ダウンロードするテキストがありません。');
+                    return;
+                }
+                const now = new Date();
+                const pad = (n) => String(n).padStart(2, '0');
+                const dateStr = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
+                const filename = `cleaned_${dateStr}.txt`;
+                const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+        });
+    </script>
+</body>
+</html>
