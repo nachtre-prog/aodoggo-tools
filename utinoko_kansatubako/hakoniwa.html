@@ -1,0 +1,4379 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>うちの子観察箱</title>
+    <style>
+        :root {
+            --bg-color: #f9f6f0;
+            --box-bg: #ffffff;
+            --text-color: #3e3a35;
+            --accent-color: #b56c60;
+            --accent-hover: #9c5c52;
+            --border-color: #e3dbcb;
+            --green-btn: #81c784;
+            --green-btn-hover: #66bb6a;
+            --sub-text: #8c8273;
+            --soft-bg: #f4efe4;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Yu Mincho", "MS Mincho", "Hiragino Mincho Pro", serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 2.5vh 20px;
+            height: 100vh;
+            height: 100dvh;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        /* アプリ全体のコンテナ（95vh / 95dvhに収める） */
+        .app-container {
+            width: 100%;
+            max-width: 1100px;
+            height: 95vh;
+            height: 95dvh;
+            display: flex;
+            gap: 20px;
+        }
+
+        /* 左パネル（7割） */
+        .left-panel {
+            flex: 7;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            height: 100%;
+            min-width: 0;
+        }
+
+        /* 右パネル（3割） */
+        .right-panel {
+            flex: 3;
+            min-width: 280px;
+            max-width: 340px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            height: 100%;
+            min-height: 0;
+        }
+
+        /* 共通ボックス */
+        .box {
+            background-color: var(--box-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 2px 6px rgba(62, 58, 53, 0.04);
+        }
+
+        /* 1. トップバー（日時・時間進行ボタン） */
+        .top-bar {
+            padding: 10px 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .time-display {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            font-weight: bold;
+            font-size: 1.02rem;
+        }
+
+        .time-clock {
+            color: var(--sub-text);
+            font-weight: normal;
+        }
+
+        .time-controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .advance-btn {
+            background-color: var(--green-btn);
+            color: #ffffff;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 18px;
+            font-family: inherit;
+            font-weight: bold;
+            font-size: 0.88rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .advance-btn:hover {
+            background-color: var(--green-btn-hover);
+        }
+
+        .skip-btn {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 5px 11px;
+            border-radius: 16px;
+            font-family: inherit;
+            font-size: 0.82rem;
+            cursor: pointer;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+
+        .skip-btn:hover {
+            background-color: var(--soft-bg);
+            border-color: var(--accent-color);
+        }
+
+        /* 2. 部屋エリア（1枚絵の定点観測スタイル・昼夜ハイブリッド対応） */
+        .room-area {
+            flex-grow: 1;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            background-color: #f4efdf;
+        }
+
+        /* 背景画像描画レイヤー（フィルターや背景画像はこのレイヤーのみにかける） */
+        .room-bg-layer {
+            position: absolute;
+            inset: 0;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            transition: background-image 0.35s ease, filter 0.45s ease, background 0.45s ease;
+            z-index: 0;
+        }
+
+        /* 画像未登録時のデフォルト背景も時間帯で空気感が変わる */
+        .room-bg-layer.default-bg-morning {
+            background: linear-gradient(to bottom, #eef6fa 65%, #e5dec9 65%);
+        }
+        .room-bg-layer.default-bg-day {
+            background: linear-gradient(to bottom, #f4efdf 65%, #e3dbcb 65%);
+        }
+        .room-bg-layer.default-bg-evening {
+            background: linear-gradient(to bottom, #f3d6be 65%, #d9c2b0 65%);
+        }
+        .room-bg-layer.default-bg-night {
+            background: linear-gradient(to bottom, #2c3545 65%, #232833 65%);
+        }
+        
+        /* 夜間のプレースホルダーテキスト色（画像あり夜フィルター時・画像なし夜デフォルト背景時の両方に対応） */
+        .room-area.is-night .room-placeholder-text {
+            color: rgba(235, 230, 220, 0.72);
+        }
+
+        /* お手軽昼夜フィルター（専用画像がない時間帯にベース画像へ自動適用） */
+        .room-bg-layer.filter-morning {
+            filter: brightness(1.04) contrast(0.98) saturate(0.96);
+        }
+        .room-bg-layer.filter-day {
+            filter: none;
+        }
+        .room-bg-layer.filter-evening {
+            filter: sepia(0.28) saturate(1.22) brightness(0.93) contrast(1.02);
+        }
+        .room-bg-layer.filter-night {
+            filter: brightness(0.82) saturate(0.85) contrast(1.05);
+        }
+
+        /* 部屋全体に重なる時間帯の空気感レイヤー */
+        .room-time-overlay {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            transition: background 0.45s ease, opacity 0.45s ease;
+            z-index: 1;
+        }
+        .room-time-overlay.tint-none {
+            background: transparent;
+        }
+        .room-time-overlay.tint-morning {
+            background: linear-gradient(180deg, rgba(215, 240, 255, 0.18) 0%, rgba(255, 250, 220, 0.10) 100%);
+        }
+        .room-time-overlay.tint-evening {
+            background: linear-gradient(180deg, rgba(255, 135, 65, 0.22) 0%, rgba(130, 55, 75, 0.18) 100%);
+        }
+        .room-time-overlay.tint-night {
+            background: linear-gradient(180deg, rgba(20, 28, 55, 0.25) 0%, rgba(15, 20, 35, 0.3) 100%);
+        }
+
+        .room-placeholder-text {
+            color: rgba(140, 130, 115, 0.45);
+            font-weight: bold;
+            font-size: 1.05rem;
+            text-align: center;
+            padding: 0 20px;
+            pointer-events: none;
+            user-select: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            z-index: 2;
+            transition: color 0.45s ease;
+        }
+
+        .room-static-icon {
+            font-size: 2.6rem;
+            opacity: 0.75;
+        }
+
+        /* 悩み吹き出し通知（💭発生時のみ部屋右上に控えめに表示） */
+        .thought-indicator {
+            position: absolute;
+            top: 14px;
+            right: 16px;
+            background-color: rgba(255, 255, 255, 0.94);
+            border: 1.5px solid var(--accent-color);
+            color: var(--text-color);
+            padding: 5px 12px;
+            border-radius: 18px;
+            font-size: 0.82rem;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            z-index: 3;
+        }
+
+        .thought-indicator.active {
+            display: flex;
+        }
+
+        /* こだわり設定（時間帯別背景・食事設定）の折りたたみボックス */
+        .bg-advanced-box {
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            padding: 12px;
+            background-color: var(--bg-color);
+            border: 1px dashed var(--border-color);
+            border-radius: 8px;
+            margin-top: 4px;
+        }
+        .bg-advanced-box.active {
+            display: flex;
+        }
+
+        .meal-preset-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .meal-preset-btn {
+            background-color: var(--box-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 5px 11px;
+            border-radius: 14px;
+            font-family: inherit;
+            font-size: 0.78rem;
+            cursor: pointer;
+            transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+        }
+
+        .meal-preset-btn:hover {
+            background-color: var(--soft-bg);
+            border-color: var(--accent-color);
+        }
+
+        .meal-preset-btn.active {
+            background-color: var(--accent-color);
+            border-color: var(--accent-color);
+            color: #ffffff;
+            font-weight: bold;
+        }
+
+        /* 休日曜日チェックボックス */
+        .holiday-setting-row {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding-top: 8px;
+            border-top: 1px dashed var(--border-color);
+        }
+
+        .holiday-days-wrap {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .holiday-day-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 11px;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            background-color: #fdfcf9;
+            font-size: 0.84rem;
+            color: var(--text-color);
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+        }
+
+        .holiday-day-chip:hover {
+            border-color: var(--accent-color);
+            background-color: var(--soft-bg);
+        }
+
+        .holiday-day-chip input[type="checkbox"] {
+            margin: 0;
+            cursor: pointer;
+        }
+
+        /* データ管理モーダル内のLLM接続ステータスバッジ */
+        .llm-status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.76rem;
+            font-weight: bold;
+        }
+
+        .llm-status-badge.connected {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #a5d6a7;
+        }
+
+        .llm-status-badge.offline {
+            background-color: var(--soft-bg);
+            color: var(--sub-text);
+            border: 1px solid var(--border-color);
+        }
+
+        .bg-slot-status {
+            font-size: 0.75rem;
+            color: var(--sub-text);
+            font-weight: normal;
+        }
+
+        /* 3. セリフ・交流エリア */
+        .dialogue-box {
+            padding: 24px 20px 14px;
+            position: relative;
+            flex-shrink: 0;
+            min-height: 112px;
+            max-height: 220px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 14px;
+        }
+
+        .name-tab {
+            position: absolute;
+            top: -15px;
+            left: 20px;
+            background-color: var(--accent-color);
+            color: #ffffff;
+            padding: 3px 20px;
+            border-radius: 16px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        .dialogue-content-wrap {
+            flex: 1;
+            min-width: 0;
+            max-height: 170px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .dialogue-text {
+            margin: 0;
+            line-height: 1.65;
+            font-size: 0.98rem;
+            overflow-wrap: break-word;
+            word-break: break-word;
+        }
+
+        .dialogue-text p {
+            margin: 3px 0;
+        }
+
+        /* 選択肢エリア（悩み💭や会話選択時のみ表示） */
+        .dialogue-choices {
+            display: none;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .dialogue-choices.active {
+            display: flex;
+        }
+
+        .choice-btn {
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 5px 12px;
+            border-radius: 14px;
+            font-family: inherit;
+            font-size: 0.82rem;
+            cursor: pointer;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+
+        .choice-btn:hover {
+            background-color: var(--soft-bg);
+            border-color: var(--accent-color);
+        }
+
+        .inline-talk-btn {
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            color: var(--sub-text);
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-size: 0.82rem;
+            font-family: inherit;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .inline-talk-btn:hover:not(:disabled) {
+            color: var(--text-color);
+            border-color: var(--accent-color);
+            background-color: var(--soft-bg);
+        }
+
+        .inline-talk-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            background-color: #f0ece3;
+            color: var(--sub-text);
+        }
+
+        /* 右上：システムボタン（2x2グリッド） */
+        .system-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            padding: 12px;
+            flex-shrink: 0;
+        }
+
+        .sys-btn {
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 9px 8px;
+            border-radius: 8px;
+            font-size: 0.86rem;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background-color 0.2s, border-color 0.2s;
+            white-space: nowrap;
+        }
+
+        .sys-btn:hover {
+            background-color: var(--soft-bg);
+            border-color: var(--accent-color);
+        }
+
+        /* 右下：ステータスパネル（低い画面でも見切れないようoverflow-y: auto対応） */
+        .status-panel {
+            flex-grow: 1;
+            min-height: 0;
+            padding: 16px 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            overflow-y: auto;
+        }
+
+        .status-header {
+            text-align: center;
+            padding-bottom: 10px;
+            border-bottom: 1px dashed var(--border-color);
+            flex-shrink: 0;
+        }
+
+        .status-name {
+            color: var(--accent-color);
+            font-size: 1.25rem;
+            font-weight: bold;
+            margin: 0;
+        }
+
+        .status-sub {
+            font-size: 0.78rem;
+            color: var(--sub-text);
+            margin-top: 3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* 顔アイコン枠（プロフィール直下に配置・正円固定） */
+        .face-icon-container {
+            margin: 2px auto 4px;
+            align-self: center;
+            width: clamp(96px, 14vh, 145px);
+            height: clamp(96px, 14vh, 145px);
+            aspect-ratio: 1 / 1;
+            border-radius: 50%;
+            flex-shrink: 0;
+            background-color: var(--bg-color);
+            border: 4px solid var(--border-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: clamp(2.4rem, 4.5vh, 3.4rem);
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .face-icon-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .section-title {
+            font-size: 0.8rem;
+            color: var(--sub-text);
+            margin-bottom: 4px;
+            font-weight: bold;
+        }
+
+        .schedule-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            font-size: 0.88rem;
+            line-height: 1.65;
+        }
+
+        .schedule-list span {
+            display: inline-block;
+            width: 54px;
+            color: var(--sub-text);
+        }
+
+        .current-action {
+            font-weight: bold;
+            font-size: 1.02rem;
+            margin: 0;
+        }
+
+        .observation-note {
+            font-size: 0.82rem;
+            color: var(--text-color);
+            line-height: 1.5;
+            margin: 0;
+            min-height: 2.8em;
+        }
+
+        .observation-note.empty {
+            color: var(--sub-text);
+        }
+
+        /* モーダル共通スタイル */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(62, 58, 53, 0.45);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            padding: 20px;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-card {
+            background-color: var(--bg-color);
+            border: 2px solid var(--border-color);
+            border-radius: 14px;
+            width: 100%;
+            max-width: 680px;
+            max-height: 88vh;
+            max-height: 88dvh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
+            overflow: hidden;
+        }
+
+        .modal-header {
+            background-color: var(--box-bg);
+            padding: 13px 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: var(--accent-color);
+            font-size: 1.08rem;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            color: var(--sub-text);
+            cursor: pointer;
+            padding: 2px 6px;
+        }
+
+        .modal-body {
+            padding: 18px 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .modal-footer {
+            background-color: var(--box-bg);
+            padding: 12px 20px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .form-section {
+            background-color: var(--box-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 14px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .form-section-title {
+            font-weight: bold;
+            color: var(--accent-color);
+            font-size: 0.92rem;
+            border-bottom: 1px dashed var(--border-color);
+            padding-bottom: 6px;
+            margin: 0;
+        }
+
+        .form-grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .form-grid-4 {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 0;
+        }
+
+        .form-group label {
+            font-size: 0.8rem;
+            color: var(--sub-text);
+            font-weight: bold;
+        }
+
+        .form-group input[type="text"],
+        .form-group input[type="password"],
+        .form-group select,
+        .form-group textarea {
+            font-family: inherit;
+            font-size: 0.9rem;
+            padding: 7px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background-color: #fdfcf9;
+            color: var(--text-color);
+            width: 100%;
+        }
+
+        .form-group input[type="file"] {
+            font-size: 0.8rem;
+            max-width: 100%;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 56px;
+        }
+
+        .preset-box {
+            background-color: var(--bg-color);
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px dashed var(--accent-color);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .preset-note {
+            font-size: 0.78rem;
+            color: var(--sub-text);
+            line-height: 1.45;
+        }
+
+        .btn-primary {
+            background-color: var(--accent-color);
+            color: #ffffff;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.88rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .btn-secondary {
+            background-color: var(--soft-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--accent-color);
+        }
+
+        .log-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 190px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .log-item {
+            padding: 8px 10px;
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.86rem;
+            line-height: 1.5;
+        }
+
+        .log-item-date {
+            font-size: 0.75rem;
+            color: var(--sub-text);
+            margin-bottom: 2px;
+        }
+
+        /* データ管理モーダル下部のクレジット表記 */
+        .credit-note {
+            text-align: center;
+            font-size: 0.76rem;
+            color: var(--sub-text);
+            line-height: 1.55;
+            padding-top: 4px;
+            opacity: 0.85;
+        }
+
+        .credit-note a {
+            color: var(--accent-color);
+            text-decoration: none;
+        }
+
+        .credit-note a:hover {
+            text-decoration: underline;
+        }
+
+        /* トースト通知 */
+        .toast {
+            position: fixed;
+            bottom: 22px;
+            right: 22px;
+            background-color: var(--text-color);
+            color: #ffffff;
+            padding: 9px 16px;
+            border-radius: 8px;
+            font-size: 0.86rem;
+            opacity: 0;
+            transform: translateY(8px);
+            pointer-events: none;
+            transition: opacity 0.25s, transform 0.25s;
+            z-index: 200;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        @keyframes pulse-text {
+            0% { opacity: 0.5; }
+            50% { opacity: 1; }
+            100% { opacity: 0.5; }
+        }
+        .loading-text {
+            color: var(--sub-text);
+            animation: pulse-text 1.5s infinite;
+            font-style: italic;
+        }
+
+        @media (max-width: 768px) {
+            body { height: auto; padding: 10px; overflow: auto; }
+            .app-container { flex-direction: column; height: auto; }
+            .left-panel, .right-panel { height: auto; max-width: none; }
+            .room-area { height: 36vh; min-height: 220px; flex-grow: 0; }
+            .form-grid-2, .form-grid-4 { grid-template-columns: 1fr 1fr; }
+        }
+
+        @media (max-width: 520px) {
+            .top-bar { padding: 10px 12px; }
+            .time-display { font-size: 0.92rem; gap: 8px; width: 100%; justify-content: space-between; }
+            .time-controls { width: 100%; justify-content: flex-end; flex-wrap: wrap; }
+            .dialogue-box { flex-direction: column; align-items: stretch; gap: 10px; max-height: none; }
+            .inline-talk-btn { align-self: flex-end; }
+            .form-grid-2, .form-grid-4 { grid-template-columns: 1fr; }
+            .modal-overlay { padding: 10px; }
+            .modal-body { padding: 14px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <!-- 左パネル：メイン観察エリア -->
+    <div class="left-panel">
+        <!-- 1. トップバー -->
+        <div class="box top-bar">
+            <div class="time-display">
+                <span id="uiDateDisplay">📅 1年目 春 3月1日 (日)</span>
+                <span class="time-clock" id="uiTimeDisplay">🕒 09:00</span>
+            </div>
+            <div class="time-controls">
+                <button type="button" class="advance-btn" id="btnAdvance1h">+1h ⏩</button>
+                <button type="button" class="skip-btn" id="btnAdvance6h">+6h</button>
+                <button type="button" class="skip-btn" id="btnAdvance1d">+1日</button>
+                <button type="button" class="skip-btn" id="btnAdvance1w">+1週</button>
+            </div>
+        </div>
+        <!-- 2. 部屋エリア（1枚絵の定点観測・昼夜ハイブリッド対応） -->
+        <div class="box room-area" id="uiRoomArea">
+            <div class="room-bg-layer default-bg-day" id="uiRoomBgLayer"></div>
+            <div class="room-time-overlay tint-none" id="uiRoomTimeOverlay"></div>
+            <div class="room-placeholder-text" id="uiRoomPlaceholder">
+                <div class="room-static-icon">🏠</div>
+                <div>【 部屋の背景画像（定点） 】</div>
+            </div>
+            <button type="button" class="thought-indicator" id="uiThoughtBtn" title="少し考え事をしているようです">
+                <span>💭</span>
+                <span>考え事をしているようだ</span>
+            </button>
+        </div>
+
+        <!-- 3. セリフ・交流エリア -->
+        <div class="box dialogue-box">
+            <div class="name-tab" id="uiDialogueName">アルマ</div>
+            <div class="dialogue-content-wrap">
+                <div class="dialogue-text" id="uiDialogueText">
+                    <p>「…おはよ。休日の朝はまだ少し眠いな。目を覚ますついでに、甘いクッキーでも焼くとしよう。」</p>
+                </div>
+                <div class="dialogue-choices" id="uiDialogueChoices"></div>
+            </div>
+            <button type="button" class="inline-talk-btn" id="btnInlineTalk">💬 話しかける</button>
+        </div>
+    </div>
+
+    <!-- 右パネル：システム・ステータスエリア -->
+    <div class="right-panel">
+        <!-- 1. システムボタン（2x2グリッド） -->
+        <div class="box system-buttons">
+            <button type="button" class="sys-btn" id="btnOpenSettings">⚙️ 設定</button>
+            <button type="button" class="sys-btn" id="btnOpenMemories">📖 思い出</button>
+            <button type="button" class="sys-btn" id="btnOpenDiary">📝 観察日記</button>
+            <button type="button" class="sys-btn" id="btnOpenData">💾 データ管理</button>
+        </div>
+
+        <!-- 2. ステータスパネル（【名前・肩書き】→【顔アイコン】→【スケジュール】→【現在行動】→【観察メモ】） -->
+        <div class="box status-panel">
+            <div class="status-header">
+                <h2 class="status-name" id="uiStatusName">アルマ</h2>
+                <div class="status-sub" id="uiStatusSub">魔法学校の生徒 / 王立魔導学院（魔導具・錬金術科）</div>
+            </div>
+
+            <div class="face-icon-container" id="uiFaceIconContainer">
+                <span id="uiFaceDefaultIcon">🙂</span>
+            </div>
+
+            <div>
+                <div class="section-title">【 スケジュール 】</div>
+                <ul class="schedule-list" id="uiScheduleList">
+                    <li><span>07:00</span> 起床・朝食</li>
+                    <li><span>08:00</span> 登校</li>
+                    <li><span>12:00</span> 昼食・休憩</li>
+                    <li><span>16:00</span> 帰宅</li>
+                    <li><span>19:00</span> 夕食</li>
+                    <li><span>23:00</span> 就寝</li>
+                </ul>
+            </div>
+
+            <div>
+                <div class="section-title">【 現在行動 】</div>
+                <p class="current-action" id="uiCurrentAction">お菓子作りをして過ごしている</p>
+            </div>
+
+            <div>
+                <div class="section-title">【 観察メモ 】</div>
+                <p class="observation-note empty" id="uiObservationNote">まだ目立った習慣は見られない。</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- モーダル1：キャラクター設定・スケジュール・画像登録 -->
+<div class="modal-overlay" id="modalSettings">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3>⚙️ キャラクター設定・生活モデル</h3>
+            <button type="button" class="close-btn" data-close="modalSettings">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-section">
+                <h4 class="form-section-title">基本情報</h4>
+                <div class="form-grid-2">
+                    <div class="form-group">
+                        <label for="inpName">名前（必須）</label>
+                        <input type="text" id="inpName" placeholder="アルマ">
+                    </div>
+                    <div class="form-group">
+                        <label for="inpJob">職業名（任意）</label>
+                        <input type="text" id="inpJob" placeholder="魔法学校の生徒">
+                    </div>
+                    <div class="form-group">
+                        <label for="inpWorkplace">勤務先・通学先（任意）</label>
+                        <input type="text" id="inpWorkplace" placeholder="王立魔導学院">
+                    </div>
+                    <div class="form-group">
+                        <label for="inpAffiliation">所属（任意）</label>
+                        <input type="text" id="inpAffiliation" placeholder="魔導具・錬金術科">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="inpHobbies">趣味（読点またはカンマ区切りで1〜5個）</label>
+                    <input type="text" id="inpHobbies" placeholder="読書, 魔法研究, ガラクタ収集, お菓子作り, 昼寝">
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4 class="form-section-title">生活モデルとスケジュール（24時間・夜行性・過眠・不眠対応）</h4>
+                <div class="form-group">
+                    <label for="selLifestyle">基本スタイル（選択すると下のスケジュールにテンプレートが反映されます）</label>
+                    <select id="selLifestyle">
+                        <option value="社会人">社会人（07:00起床 / 08:00出勤 / 18:00帰宅 / 23:00就寝）</option>
+                        <option value="学生">学生（07:00起床 / 08:00登校 / 16:00帰宅 / 23:00就寝）</option>
+                        <option value="フリーランス">フリーランス（08:00起床 / 10:00仕事開始 / 18:00終了 / 24:00就寝）</option>
+                        <option value="主婦・主夫">主婦・主夫（06:00起床 / 08:00家事 / 16:00自由時間 / 22:00就寝）</option>
+                        <option value="無職">無職（09:00起床 / 自由時間 / 25:00就寝）</option>
+                        <option value="夜行性">夜行性（18:00起床 / 自由時間 / 10:00就寝 ※昼夜逆転）</option>
+                        <option value="過眠・おねむ">過眠・おねむ（14:00起床 / 自由時間 / 16:00就寝 ※ほぼ1日中寝ている）</option>
+                        <option value="不眠・24時間稼働">不眠・24時間稼働（睡眠なし / 24時間活動 ※1日中起きている）</option>
+                        <option value="冬眠・終日睡眠">冬眠・終日睡眠（起床なし / 1日中眠っている）</option>
+                        <option value="独自">独自（カスタム設定）</option>
+                    </select>
+                </div>
+                <div class="form-grid-4">
+                    <div class="form-group">
+                        <label for="selWake">起床時間</label>
+                        <select id="selWake"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="selStart">出勤・開始</label>
+                        <select id="selStart"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="selEnd">帰宅・終了</label>
+                        <select id="selEnd"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="selSleep">就寝時間</label>
+                        <select id="selSleep"></select>
+                    </div>
+                </div>
+                <div class="preset-note" id="uiScheduleSleepHint">※「ほぼ1日中寝ているキャラ」は起床と就寝の間隔を1〜3時間（例：14:00起床 / 16:00就寝）に設定、「1日中起きているキャラ」は就寝時間を「なし（24時間稼働）」に設定できます。</div>
+
+                <!-- 休日（曜日）設定 -->
+                <div class="holiday-setting-row">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+                        <label style="font-size:0.8rem; color:var(--sub-text); font-weight:bold;">🎌 休日設定（チェックした曜日は仕事・学業がお休みになり、終日自由時間になります）</label>
+                        <div style="display:flex; gap:6px;">
+                            <button type="button" class="meal-preset-btn" id="btnHolidayWeekend" style="padding:3px 9px; font-size:0.75rem;">土日休み</button>
+                            <button type="button" class="meal-preset-btn" id="btnHolidayNone" style="padding:3px 9px; font-size:0.75rem;">休日なし（ワーホリ）</button>
+                            <button type="button" class="meal-preset-btn" id="btnHolidayEveryday" style="padding:3px 9px; font-size:0.75rem;">毎日休日</button>
+                        </div>
+                    </div>
+                    <div class="holiday-days-wrap" id="uiHolidayDaysWrap">
+                        <label class="holiday-day-chip"><input type="checkbox" name="chkHoliday" value="日" checked><span>日曜</span></label>
+                        <label class="holiday-day-chip"><input type="checkbox" name="chkHoliday" value="月"><span>月曜</span></label>
+                        <label class="holiday-day-chip"><input type="checkbox" name="chkHoliday" value="火"><span>火曜</span></label>
+                        <label class="holiday-day-chip"><input type="checkbox" name="chkHoliday" value="水"><span>水曜</span></label>
+                        <label class="holiday-day-chip"><input type="checkbox" name="chkHoliday" value="木"><span>木曜</span></label>
+                        <label class="holiday-day-chip"><input type="checkbox" name="chkHoliday" value="金"><span>金曜</span></label>
+                        <label class="holiday-day-chip"><input type="checkbox" name="chkHoliday" value="土" checked><span>土曜</span></label>
+                    </div>
+                </div>
+
+                <!-- 食事・休憩のこだわり設定（折りたたみタブ） -->
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; padding-top:6px; border-top:1px dashed var(--border-color);">
+                    <span id="uiMealSummaryLabel" style="font-size:0.82rem; color:var(--sub-text);">🍽️ 現在の食生活：規則正しい（朝食あり / 12:00休憩 / 夕食あり）</span>
+                    <button type="button" class="btn-secondary" id="btnToggleMealBox" style="font-size:0.8rem; padding:5px 10px;">🍽️ 食事・休憩のこだわり設定を開く ▼</button>
+                </div>
+
+                <div class="bg-advanced-box" id="uiMealAdvancedBox">
+                    <div class="preset-note">※規則正しい3食スタイルから、朝抜き・1日1食の不摂生キャラ、食事をとらない人外・機械・過集中キャラまでワンクリックまたは個別設定で調整できます。</div>
+                    <div class="form-group">
+                        <label>💡 食生活・休憩プリセット（ワンクリック適用）</label>
+                        <div class="meal-preset-row">
+                            <button type="button" class="meal-preset-btn" data-meal-preset="regular">🍙 規則正しい（3食＋昼休憩）</button>
+                            <button type="button" class="meal-preset-btn" data-meal-preset="no_breakfast">☕ 朝抜き（昼休憩＋夕食）</button>
+                            <button type="button" class="meal-preset-btn" data-meal-preset="one_night">🌙 不摂生・1日1食（夜のみ）</button>
+                            <button type="button" class="meal-preset-btn" data-meal-preset="one_noon">☀️ 昼休憩のみ（朝・夕なし）</button>
+                            <button type="button" class="meal-preset-btn" data-meal-preset="none">🤖 食事・休憩なし（人外・没頭）</button>
+                        </div>
+                    </div>
+
+                    <div class="form-grid-2" style="align-items:center;">
+                        <div class="form-group">
+                            <label for="selMealBreak">🕛 メイン休憩・軽食時間</label>
+                            <select id="selMealBreak"></select>
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:8px; padding-top:6px;">
+                            <label style="font-size:0.83rem; color:var(--text-color); display:flex; align-items:center; gap:6px; cursor:pointer;">
+                                <input type="checkbox" id="chkMealBreakfast" checked>
+                                <span>🌅 朝食をとる（起床時または起床直後に自動発生）</span>
+                            </label>
+                            <label style="font-size:0.83rem; color:var(--text-color); display:flex; align-items:center; gap:6px; cursor:pointer;">
+                                <input type="checkbox" id="chkMealDinner" checked>
+                                <span>🍽️ 夕食をとる（19:00または活動時間後半に自動発生）</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4 class="form-section-title">性格・口調・好悪</h4>
+                <div class="form-group">
+                    <label for="inpSummary">キャラクター設定（概要・性格）</label>
+                    <textarea id="inpSummary" rows="4" placeholder="真面目で読書好き。仕事になると少し熱中しやすい。"></textarea>
+                </div>
+
+                <!-- 口調・セリフ例プリセット選択枠 -->
+                <div class="form-group preset-box">
+                    <label for="selSpeechPreset" style="color: var(--accent-color);">💡 口調・セリフ例プリセット（選択すると下の「口調」と「例文」に自動入力されます）</label>
+                    <select id="selSpeechPreset">
+                        <option value="">-- プリセットを選択して自動入力 --</option>
+                        <option value="polite">1. 丁寧・敬語（真面目、執事、後輩など）</option>
+                        <option value="cool">2. クール・無口（学者、達観、静かなど）</option>
+                        <option value="friendly">3. 気さく・親しい（普通の青年、相棒、同級生など）</option>
+                        <option value="rough">4. 粗雑・ぶっきらぼう（俺様、不良、ツンデレなど）</option>
+                        <option value="energetic">5. 元気・無邪気（活発、妹・弟、子供など）</option>
+                        <option value="gentle">6. おっとり・上品（お嬢様、穏やかな女性など）</option>
+                        <option value="elder">7. 老人・達観（師匠、ご隠居、仙人など）</option>
+                    </select>
+                    <div class="preset-note">※プリセット反映後、気に入らないセリフは削除・変更しましょう。また、オフラインモードでも「朝」「夜」「お茶」「休憩」「仕事」などの言葉を含む例文を時間帯や状況に合わせて優先的に喋ります。</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="inpTone">口調・話し方の設定（一人称・語尾・ニュアンスなど複数行で記述可能）</label>
+                    <textarea id="inpTone" rows="4" placeholder="一人称は「私」。落ち着いた丁寧な話し方。&#10;語尾は「〜だな」「〜だ」「〜かもしれない」。&#10;感情を大きく表に出すことは少ないが、好きなものの話題になると少し饒舌になる。"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="inpSpeechSamples">独り言・口調の例文（1行に1セリフ / ※気に入らないセリフは削除・変更しましょう）</label>
+                    <textarea id="inpSpeechSamples" rows="8" placeholder="「今日は静かだな。」&#10;「少し紅茶でも淹れるとするか。」"></textarea>
+                </div>
+                <div class="form-grid-2">
+                    <div class="form-group">
+                        <label for="inpLikes">好きなもの（カンマ区切り）</label>
+                        <input type="text" id="inpLikes" placeholder="紅茶, 読書, 結晶">
+                    </div>
+                    <div class="form-group">
+                        <label for="inpDislikes">苦手なもの（カンマ区切り）</label>
+                        <input type="text" id="inpDislikes" placeholder="騒音, 人混み">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4 class="form-section-title">画像の登録（お手軽昼夜モード＋時間帯別カスタム対応・任意）</h4>
+                <div class="form-grid-2">
+                    <div class="form-group">
+                        <label for="inpFaceImage">顔アイコン画像 <span class="bg-slot-status" id="uiFaceImgStatus"></span></label>
+                        <input type="file" id="inpFaceImage" accept="image/*">
+                        <button type="button" class="btn-secondary" id="btnClearFaceImage" style="margin-top:4px;">アイコン画像をクリア</button>
+                    </div>
+                    <div class="form-group">
+                        <label for="inpRoomImage">基本の部屋背景（昼・ベース画像） <span class="bg-slot-status" id="uiRoomDayStatus"></span></label>
+                        <input type="file" id="inpRoomImage" accept="image/*">
+                        <button type="button" class="btn-secondary" id="btnClearRoomImage" style="margin-top:4px;">基本背景をクリア</button>
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; padding-top:4px; border-top:1px dashed var(--border-color);">
+                    <label style="font-size:0.84rem; color:var(--text-color); display:flex; align-items:center; gap:6px; cursor:pointer;">
+                        <input type="checkbox" id="chkDayNightEffect" checked>
+                        <span>🌞🌙 お手軽昼夜モード（専用画像がない時間帯はベース画像から朝・夕・夜の色調を自動生成）</span>
+                    </label>
+                    <button type="button" class="btn-secondary" id="btnToggleTimeBgBox" style="font-size:0.8rem; padding:5px 10px;">🌅 朝・夕・夜の個別画像を設定する ▼</button>
+                </div>
+
+                <div class="bg-advanced-box" id="uiTimeBgAdvancedBox">
+                    <div class="preset-note">※必要な時間帯の画像だけアップロードできます。未登録の時間帯は、基本背景（または一番近い登録画像）からお手軽昼夜フィルターで自動補完されます。</div>
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label for="inpRoomMorning">🌅 朝の背景（05:00〜09:00） <span class="bg-slot-status" id="uiRoomMorningStatus"></span></label>
+                            <input type="file" id="inpRoomMorning" accept="image/*">
+                            <button type="button" class="btn-secondary" id="btnClearRoomMorning" style="margin-top:4px;">朝画像をクリア</button>
+                        </div>
+                        <div class="form-group">
+                            <label for="inpRoomEvening">🌇 夕方の背景（16:00〜18:00） <span class="bg-slot-status" id="uiRoomEveningStatus"></span></label>
+                            <input type="file" id="inpRoomEvening" accept="image/*">
+                            <button type="button" class="btn-secondary" id="btnClearRoomEvening" style="margin-top:4px;">夕方画像をクリア</button>
+                        </div>
+                        <div class="form-group">
+                            <label for="inpRoomNight">🌙 夜・深夜の背景（19:00〜04:00） <span class="bg-slot-status" id="uiRoomNightStatus"></span></label>
+                            <input type="file" id="inpRoomNight" accept="image/*">
+                            <button type="button" class="btn-secondary" id="btnClearRoomNight" style="margin-top:4px;">夜画像をクリア</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-secondary" data-close="modalSettings">キャンセル</button>
+            <button type="button" class="btn-primary" id="btnSaveSettings">設定を保存する</button>
+        </div>
+    </div>
+</div>
+
+<!-- モーダル2A：📖 思い出（キャラクター側の1日1ログ記録） -->
+<div class="modal-overlay" id="modalMemories">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3 id="uiMemoriesModalTitle">📖 アルマの日々の思い出（1日1ログ）</h3>
+            <button type="button" class="close-btn" data-close="modalMemories">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-section">
+                <h4 class="form-section-title" id="uiMemoriesSubTitle">アルマ自身の振り返り（1日につき1件記録されます）</h4>
+                <div class="log-list" id="uiMemoriesList" style="max-height: 52vh;"></div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-secondary" data-close="modalMemories">閉じる</button>
+        </div>
+    </div>
+</div>
+
+<!-- モーダル2B：📝 観察日記（プレイヤー側のキャラクター別記録） -->
+<div class="modal-overlay" id="modalDiary">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3 id="uiDiaryModalTitle">📝 アルマの観察日記</h3>
+            <button type="button" class="close-btn" data-close="modalDiary">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-section">
+                <h4 class="form-section-title" id="uiDiaryWriteTitle">アルマの様子を観察者メモに記帳する</h4>
+                <div style="display:flex; gap:8px;">
+                    <input type="text" id="inpDiaryEntry" placeholder="アルマの今日見かけた様子や気づきを記録（Enterでも記帳）..." style="flex:1; padding:7px 10px; border:1px solid var(--border-color); border-radius:6px; font-family:inherit;">
+                    <button type="button" class="btn-primary" id="btnAddDiary">記帳する</button>
+                </div>
+            </div>
+            <div class="form-section">
+                <h4 class="form-section-title" id="uiDiaryHistoryTitle">これまでの観察日記（アルマ）</h4>
+                <div class="log-list" id="uiDiaryList" style="max-height: 40vh;"></div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-secondary" data-close="modalDiary">閉じる</button>
+        </div>
+    </div>
+</div>
+
+<!-- モーダル3：💬 話しかける（交流モーダル） -->
+<div class="modal-overlay" id="modalTalk">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3>💬 住人に声をかける（1時間に1回）</h3>
+            <button type="button" class="close-btn" data-close="modalTalk">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-section">
+                <h4 class="form-section-title">さりげなく声をかける（定型アクション）</h4>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button type="button" class="choice-btn" data-quick-talk="調子はどう？">「調子はどう？」</button>
+                    <button type="button" class="choice-btn" data-quick-talk="今なにしてるの？">「今なにしてるの？」</button>
+                    <button type="button" class="choice-btn" data-quick-talk="無理せずゆっくりしてね">「無理せずゆっくりしてね」</button>
+                    <button type="button" class="choice-btn" data-quick-talk="邪魔しないように見守る">（邪魔しないようにそっと見守る）</button>
+                </div>
+            </div>
+            <div class="form-section">
+                <h4 class="form-section-title">自由な言葉で話しかける</h4>
+                <div style="display:flex; gap:8px;">
+                    <input type="text" id="inpTalkMessage" placeholder="かける言葉を入力（Enterでも送信可能・空欄でもOK）..." style="flex:1; padding:7px 10px; border:1px solid var(--border-color); border-radius:6px; font-family:inherit;">
+                    <button type="button" class="btn-primary" id="btnSendTalk">声をかける</button>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-secondary" data-close="modalTalk">キャンセル</button>
+        </div>
+    </div>
+</div>
+
+<!-- モーダル4：データ管理（キャラ切替・ローカルLLM設定・エクスポート・インポート） -->
+<div class="modal-overlay" id="modalData">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3>💾 データ管理・住人切り替え・LLM接続</h3>
+            <button type="button" class="close-btn" data-close="modalData">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-section">
+                <h4 class="form-section-title">住人の切り替え・新規作成</h4>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <select id="selCharSwitch" style="flex:1; padding:7px 10px; border:1px solid var(--border-color); border-radius:6px; font-family:inherit;"></select>
+                    <button type="button" class="btn-primary" id="btnNewCharacter">＋ 新しい住人を迎える</button>
+                    <button type="button" class="btn-secondary" id="btnDeleteCharacter">現在の住人を削除</button>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4 class="form-section-title" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                    <span>🤖 LLM接続設定（ローカルLLM / API / オフライン）</span>
+                    <span id="uiLlmConnectionBadge" class="llm-status-badge offline">📴 オフラインモード</span>
+                </h4>
+                <div class="form-group">
+                    <label for="selLlmProvider">使用エンジン</label>
+                    <select id="selLlmProvider">
+                        <option value="offline" selected>オフライン（LLMを呼ばず時間帯・状況に合わせて口調例文を選択）</option>
+                        <option value="gemini">標準（Gemini API / Web環境）</option>
+                        <option value="local_openai">ローカルLLM（OpenAI互換：LM Studio / Ollama 等）</option>
+                    </select>
+                </div>
+                <div id="llmLocalConfigArea" style="display:none; flex-direction:column; gap:10px; margin-top:4px;">
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label for="inpLlmEndpoint">エンドポイントURL（OpenAI互換）</label>
+                            <input type="text" id="inpLlmEndpoint" placeholder="http://localhost:1234/v1/chat/completions">
+                        </div>
+                        <div class="form-group">
+                            <label for="inpLlmModel">モデル名（任意・Ollama等は必須）</label>
+                            <input type="text" id="inpLlmModel" placeholder="例: gemma2:2b / qwen2.5:7b / local-model">
+                        </div>
+                    </div>
+                </div>
+                <div id="llmGeminiConfigArea" style="display:none; flex-direction:column; gap:8px; margin-top:4px;">
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label for="inpGeminiApiKey">Gemini APIキー（マスク表示）</label>
+                            <input type="password" id="inpGeminiApiKey" autocomplete="off" placeholder="AIza...（取得したAPIキーを入力）">
+                        </div>
+                        <div class="form-group">
+                            <label for="inpGeminiModel">Gemini モデル名</label>
+                            <input type="text" id="inpGeminiModel" placeholder="gemini-3-flash-preview">
+                        </div>
+                    </div>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-top:4px;">
+                    <span id="uiLlmTestResult" style="font-size:0.8rem; color:var(--sub-text);">初期状態はオフラインモードです。LLMを使う場合はエンジンを選択して保存してください。</span>
+                    <div style="display:flex; gap:8px;">
+                        <button type="button" class="btn-secondary" id="btnTestLlm">現在の住人でセリフ生成テスト</button>
+                        <button type="button" class="btn-primary" id="btnSaveLlmConfig">接続設定を保存</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4 class="form-section-title">データの書き出し / 読み込み（JSON）</h4>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button type="button" class="btn-secondary" id="btnExportJson">現在の住人データをダウンロード (.json)</button>
+                    <label class="btn-secondary" style="cursor:pointer; display:inline-block;">
+                        JSONファイルを読み込む
+                        <input type="file" id="inpImportJson" accept=".json,application/json" style="display:none;">
+                    </label>
+                </div>
+                <div id="uiImportConflictBox" style="display:none; background-color:var(--bg-color); border:1px dashed var(--accent-color); border-radius:8px; padding:10px 12px; flex-direction:column; gap:8px;">
+                    <div id="uiImportConflictText" style="font-size:0.84rem; line-height:1.45;">同じIDの住人が既に存在します。</div>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <button type="button" class="btn-primary" id="btnImportOverwrite">既存の住人を上書き復元</button>
+                        <button type="button" class="btn-secondary" id="btnImportAsNew">別の住人として追加</button>
+                        <button type="button" class="btn-secondary" id="btnImportCancel">キャンセル</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4 class="form-section-title">初期化</h4>
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <span style="font-size:0.82rem; color:var(--sub-text);">すべての保存データを初期状態（アルマ）に戻します。</span>
+                    <button type="button" class="btn-secondary" id="btnResetStorage">初期状態にリセット</button>
+                </div>
+            </div>
+
+            <div class="credit-note">
+                <div>Created on 2026/11/13　制作者:れっ＆リュシア</div>
+                <div><a href="https://x.com/fried_more" target="_blank" rel="noopener noreferrer">https://x.com/fried_more</a></div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-secondary" data-close="modalData">閉じる</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="uiToast">保存しました</div>
+
+<script>
+/**
+ * 『うちの子観察箱』箱庭観察アプリ（完全版）
+ * - 24時間円環スケジュール計算（ほぼ1日中寝ている過眠キャラ・終日睡眠・睡眠なし24時間稼働・完全夜行性対応）
+ * - 夜行性（18時起床など）での独立朝食枠と夕食枠の衝突回避を実装
+ * - 旧セーブデータの進行状況・日記・思い出の安全な引き継ぎ＆旧出勤スケジュールの自動補正を実装
+ * - LLMプロンプトに「日本語以外の言語の混入禁止」の厳格な制約を追加
+ * - 初期状態は「オフラインモード（provider: 'offline'）」から開始
+ */
+
+const STORAGE_KEY_ALL = 'hakoniwa_oc_app_v1_chars';
+const STORAGE_KEY_ACTIVE = 'hakoniwa_oc_app_v1_active';
+const STORAGE_KEY_LLM = 'hakoniwa_oc_app_v1_llm_config';
+
+const DAYS_JP = ['日', '月', '火', '水', '木', '金', '土'];
+const HABIT_DISPLAY_THRESHOLD = 5;
+const HABIT_WEIGHT_CAP = 20; 
+const LLM_TIMEOUT_MS = 60000; 
+
+const SPEECH_PRESETS = {
+    polite: {
+        tone: '一人称は「私」。誰に対しても丁寧で、落ち着いた敬語で話す。\n語尾は「〜ですね」「〜ます」「〜でしょうか」。\n感情は穏やかで、少し謙虚なニュアンスを含む。',
+        samples: [
+            '「おはようございます。今日も穏やかな良い朝ですね。」',
+            '「ただいま戻りました。少し休憩にいたしましょうか。」',
+            '「ふふ、温かい紅茶の香りは落ち着きますね。美味しい食事もいただいて一息つきました。」',
+            '「今は少し手が離せません。申し訳ありませんが、後ほど。」',
+            '「おや、いらしていたのですね。お茶でもいかがですか？」',
+            '「素晴らしい。これは次の研究に活かせそうですね。」',
+            '「順調に進んでおります。焦る必要はありませんよ。」',
+            '「少し疲れてしまいましたね。無理は禁物です。」',
+            '「ええ、とても楽しい時間を過ごしていますよ。」',
+            '「夜も更けましたね。そろそろ休むといたしましょう。」'
+        ]
+    },
+    cool: {
+        tone: '一人称は「私」。口数は少なく、淡々と事実や思考を述べる。\n語尾は「〜だな」「〜だ」「〜かもしれない」。\n感情の起伏は少ないが、静かな時間を好む。',
+        samples: [
+            '「悪くない朝だ。予定通りに進めるとしよう。」',
+            '「今日は静かだな。読書にはちょうどいい。」',
+            '「興味深い構造だ。もう少し掘り下げてみるか。」',
+            '「…すまないが、今は少し集中させてくれないか。」',
+            '「ああ、君か。別に構わない、そこに座るといい。」',
+            '「さて、軽く食事をとって一息つくとするか。腹が減っては集中できないからな。」',
+            '「少し疲労が溜まっているな。目を休めるとしよう。」',
+            '「騒がしいのは好まない。一人の時間が一番だ。」',
+            '「ほう、それは少し面白い視点だな。」',
+            '「…もうこんな時間か。今日はここまでにしよう。」'
+        ]
+    },
+    friendly: {
+        tone: '一人称は「俺」または「僕」。明るく親しみやすい、フランクな話し方。\n語尾は「〜だよな」「〜するよ」「〜かな」。\n裏表がなく、素直に感情を表現する。',
+        samples: [
+            '「おっはよー！いやー、今日もいい天気だな！」',
+            '「よーし、今日もいっちょ頑張りますか！」',
+            '「あはは、それめっちゃ面白いじゃん！」',
+            '「ごめん、今ちょっと手が離せないんだ！後にして！」',
+            '「おっ、遊びに来たの？ちょうどお茶淹れようと思ってたんだ。」',
+            '「うーん、これどうやったら上手くいくのかな…。」',
+            '「ふぅー、お腹すいた！ご飯食べてちょっと休憩にしよっと。」',
+            '「なんだか眠くなってきたかも…。少し横になろうかな。」',
+            '「えっ、ほんとに！？それはすごいな！」',
+            '「ふわぁ…もう寝る時間か。おやすみー！」'
+        ]
+    },
+    rough: {
+        tone: '一人称は「俺」。少し乱暴でぶっきらぼうな話し方。\n語尾は「〜だろ」「〜じゃねえか」「〜しろよ」。\n態度は大きいが、実は少し面倒見が良い一面もある。',
+        samples: [
+            '「ふわぁ…なんだよ、もう朝かよ。」',
+            '「チッ…めんどくせえな。さっさと終わらせるか。」',
+            '「あ？今は話しかけんな、忙しいんだよ。」',
+            '「ほらよ、お茶だ。勝手に飲め。」',
+            '「腹減ったな…適当に飯食ってちょっと休むか。」',
+            '「おい、そんなとこで何やってんだ。こっち来いよ。」',
+            '「ったく、世話が焼けるぜ…。今回だけだからな。」',
+            '「悪くねえじゃねえか。まあ、認めてやらなくもない。」',
+            '「はぁ？んなこと知るかよ。」',
+            '「…もう寝る。電気消せよな。」'
+        ]
+    },
+    energetic: {
+        tone: '一人称は「あたし」または「僕」。子供っぽく、元気いっぱいで感情豊か。\n語尾は「〜だよね！」「〜するぞー！」「えへへ」。\n好奇心旺盛で、楽しいことが大好き。',
+        samples: [
+            '「おっはよー！！今日もいーっぱい遊ぶぞー！」',
+            '「わーい！お休みだー！何して遊ぼうかな！」',
+            '「えへへ、ご飯の時間は大好きなんだ！おいしい〜！」',
+            '「んー？今ね、すっごく集中してるの！邪魔しないでね！」',
+            '「あ！来てくれたの！？もっとお話ししよ！」',
+            '「じゃーん！これ見て見て！すごいでしょ！」',
+            '「むにゃむにゃ…まだ眠いよぅ…。」',
+            '「お腹すいたー！なんか甘いもの食べたいなー！」',
+            '「あははは！おもしろーい！もう一回やって！」',
+            '「ばいばーい！また明日も遊ぼうね！」'
+        ]
+    },
+    gentle: {
+        tone: '一人称は「私」。ゆっくりとしたペースで、上品で優雅な話し方。\n語尾は「〜ですわ」「〜ね」「〜かしら」。\n争いを好まず、何事も優雅に楽しむ。',
+        samples: [
+            '「ごきげんよう。気持ちの良い朝ですわね。」',
+            '「あら、いらしていたの？ふふ、嬉しいですわ。」',
+            '「少し休憩してお茶と食事にいたしましょうか。美味しいお菓子もありますのよ。」',
+            '「まあ、困りましたわね…。どういたしましょう。」',
+            '「申し訳ありません、今は少し取り込んでおりますの。」',
+            '「ゆっくりと進めましょう。あわてなくても大丈夫ですわよ。」',
+            '「ふふ、素敵な時間ですわ。心が洗われますね。」',
+            '「あらあら、それは大変でしたわね。」',
+            '「まあ、可愛らしい。とても素敵だと思いますわ。」',
+            '「今日は良い一日でしたわ。おやすみなさいませ。」'
+        ]
+    },
+    elder: {
+        tone: '一人称は「ワシ」。年齢を重ねた、ゆったりとして達観した話し方。\n語尾は「〜じゃ」「〜のう」「〜しておる」。\n細かいことは気にせず、物事を俯瞰して見ている。',
+        samples: [
+            '「ふぉっふぉ、今日も良い天気じゃのう。」',
+            '「まあ、そう急ぐでない。お茶でも飲んでいきなされ。」',
+            '「すまんのう、ワシは今、手が離せんのじゃ。」',
+            '「ほっほ、面白いことを言う。若い者は元気で良いのう。」',
+            '「なんじゃ、用事か？まあ、そこに座りなされ。」',
+            '「さて、腹ごしらえをして一息つくとするかのう。温かい飯はありがたいわい。」',
+            '「なるようになるわい。焦っても仕方があるまい。」',
+            '「少し疲れたかのう。横になるとしよう。」',
+            '「ほれ、無理をするでないぞ。」',
+            '「さて、日も暮れた。今日も無事に終わったわい。」'
+        ]
+    }
+};
+
+function createDefaultLlmConfig() {
+    return {
+        provider: 'offline', 
+        localEndpoint: 'http://localhost:1234/v1/chat/completions',
+        localModel: 'local-model',
+        geminiApiKey: '',
+        geminiModel: 'gemini-3-flash-preview'
+    };
+}
+
+const LIFESTYLE_MODELS = {
+    '社会人': { wake: 7, start: 8, end: 18, sleep: 23, startLabel: '出勤', endLabel: '帰宅', activeAction: '勤務中' },
+    '学生': { wake: 7, start: 8, end: 16, sleep: 23, startLabel: '登校', endLabel: '帰宅', activeAction: '授業・学業中' },
+    'フリーランス': { wake: 8, start: 10, end: 18, sleep: 24, startLabel: '仕事開始', endLabel: '仕事終了', activeAction: '仕事中' },
+    '主婦・主夫': { wake: 6, start: 8, end: 16, sleep: 22, startLabel: '家事', endLabel: '自由時間', activeAction: '家事をしている' },
+    '無職': { wake: 9, start: null, end: null, sleep: 25, startLabel: '予定なし', endLabel: '自由時間', activeAction: null },
+    '夜行性': { wake: 18, start: null, end: null, sleep: 10, startLabel: '活動開始', endLabel: '活動終了', activeAction: '活動中' },
+    '過眠・おねむ': { wake: 14, start: null, end: null, sleep: 16, startLabel: '活動開始', endLabel: '活動終了', activeAction: '活動中' },
+    '不眠・24時間稼働': { wake: 7, start: null, end: null, sleep: null, startLabel: '活動開始', endLabel: '活動終了', activeAction: '活動中' },
+    '冬眠・終日睡眠': { wake: null, start: null, end: null, sleep: 0, startLabel: '予定なし', endLabel: '予定なし', activeAction: null },
+    '独自': { wake: 7, start: 9, end: 17, sleep: 23, startLabel: '活動開始', endLabel: '活動終了', activeAction: '活動中' }
+};
+
+const MEAL_PRESETS = {
+    regular: { breakfast: true, breakHour: 12, dinner: true, label: '🍙 規則正しい（3食＋12:00休憩）' },
+    no_breakfast: { breakfast: false, breakHour: 12, dinner: true, label: '☕ 朝抜き（昼休憩＋夕食）' },
+    one_night: { breakfast: false, breakHour: null, dinner: true, label: '🌙 不摂生・1日1食（夜のみ）' },
+    one_noon: { breakfast: false, breakHour: 12, dinner: false, label: '☀️ 昼休憩のみ（朝・夕なし）' },
+    none: { breakfast: false, breakHour: null, dinner: false, label: '🤖 食事・休憩なし（人外・没頭）' }
+};
+
+function isSafeImageDataUrl(val) {
+    if (typeof val !== 'string' || !val) return false;
+    return /^data:image\/(png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=\s]+$/i.test(val.trim());
+}
+
+function getTimePeriodByHour(hour) {
+    if (hour >= 5 && hour <= 9) return 'morning';
+    if (hour >= 10 && hour <= 15) return 'day';
+    if (hour >= 16 && hour <= 18) return 'evening';
+    return 'night';
+}
+
+function resolveRoomBackgroundState(profile, hour) {
+    const period = getTimePeriodByHour(hour);
+    const useEffect = profile.enableDayNightEffect !== false;
+    const customImgs = (profile.roomImages && typeof profile.roomImages === 'object') ? profile.roomImages : {};
+
+    const slotMap = {
+        day: isSafeImageDataUrl(profile.roomImageData) ? profile.roomImageData.trim() : '',
+        morning: isSafeImageDataUrl(customImgs.morning) ? customImgs.morning.trim() : '',
+        evening: isSafeImageDataUrl(customImgs.evening) ? customImgs.evening.trim() : '',
+        night: isSafeImageDataUrl(customImgs.night) ? customImgs.night.trim() : ''
+    };
+
+    if (slotMap[period]) {
+        return {
+            hasImage: true,
+            imageUrl: slotMap[period],
+            filterClass: 'filter-day',
+            tintClass: 'tint-none',
+            defaultBgClass: ''
+        };
+    }
+
+    const fallbackOrder = {
+        morning: ['day', 'evening', 'night'],
+        day: ['morning', 'evening', 'night'],
+        evening: ['day', 'morning', 'night'],
+        night: ['evening', 'day', 'morning']
+    };
+
+    let baseUrl = '';
+    for (const candidateKey of fallbackOrder[period]) {
+        if (slotMap[candidateKey]) {
+            baseUrl = slotMap[candidateKey];
+            break;
+        }
+    }
+
+    if (baseUrl) {
+        return {
+            hasImage: true,
+            imageUrl: baseUrl,
+            filterClass: useEffect ? `filter-${period}` : 'filter-day',
+            tintClass: (useEffect && period !== 'day') ? `tint-${period}` : 'tint-none',
+            defaultBgClass: ''
+        };
+    }
+
+    return {
+        hasImage: false,
+        imageUrl: '',
+        filterClass: 'filter-day',
+        tintClass: 'tint-none',
+        defaultBgClass: useEffect ? `default-bg-${period}` : 'default-bg-day'
+    };
+}
+
+function createEmptyHabits(hobbies, existing = null) {
+    const map = {};
+    DAYS_JP.forEach(day => {
+        map[day] = {};
+        hobbies.forEach(h => {
+            const prev = existing && existing[day] && typeof existing[day][h] === 'number' && Number.isFinite(existing[day][h])
+                ? Math.max(0, Math.floor(existing[day][h]))
+                : 0;
+            map[day][h] = prev;
+        });
+    });
+    return map;
+}
+
+function createDefaultCharacterAlma() {
+    const hobbies = ['読書', '魔法研究', 'ガラクタ収集', 'お菓子作り', '昼寝'];
+    return {
+        profile: {
+            id: 'char_alma_default',
+            name: 'アルマ',
+            job: '魔法学校の生徒',
+            workplace: '王立魔導学院',
+            affiliation: '魔導具・錬金術科',
+            summary: '普段はクールで理知的な優等生だが、朝は絶望的に弱く、機嫌が最悪になる。背が低いことを密かに気にしており、高い所の物を取るのが苦手。休日は怪しい魔導具のガラクタを収集したり、こっそり可愛いお菓子を焼いて過ごすのが好き。',
+            tone: '一人称は「私」。普段は口数が少なく、落ち着いたクールな話し方をする。\n語尾は「〜だな」「〜だ」「〜かもしれない」。\nただし寝起きや朝の時間帯は眠気で機嫌が悪く、少しむすっとした覇気のない喋り方になる。背が低いことや高い場所の話題になると少しムキになる。',
+            speechSamples: [
+                '「…おはよ。まだ眠い。朝は頭が回らないから話しかけないでくれ…」',
+                '「ふわぁ…なぜ朝というものは毎日来るんだ。あと5分だけ寝かせてくれ。」',
+                '「このガラクタ、微弱な魔力の残滓が…いや、ただの古い金具か？まあいい、回収しておこう。」',
+                '「…一番上の棚にある魔導書を取ってくれないか。べ、別に背が届かないわけじゃない、踏み台を出すのが面倒なだけだ。」',
+                '「今日は気分転換にクッキーを焼いてみた。…少し形がいびつだが、味見してみるか？」',
+                '「ふむ、この術式は少し非効率だな。私の手で組み替えてみよう。」',
+                '「今日は静かだな。甘いお菓子と紅茶があれば、いくらでも読書に没頭できる。」',
+                '「…すまないが、今は錬金術の調合中で手が離せない。少し後にしてくれ。」',
+                '「ああ、君か。ちょうど焼きたてのスコーンがある。そこに座ってお茶にするといい。」',
+                '「さて、そろそろ休憩にして軽い食事をとるか。糖分を補給しないと魔力の制御が鈍るからな。」',
+                '「ただいま。今日の講義は少し長引いて疲れたな…温かい夕食と甘いもので一息つこう。」',
+                '「騒がしい場所は苦手だ。こうして部屋でガラクタをいじっている方が落ち着く。」',
+                '「…もうこんな時間か。明日の朝も早いし、そろそろ眠るとしよう。おやすみ。」'
+            ],
+            likes: ['甘いお菓子', '古い魔導具', '静かな場所'],
+            dislikes: ['朝', '高いところ', '騒音'],
+            hobbies: hobbies,
+            lifeStyle: '学生',
+            schedule: {
+                wake: 7,
+                start: 8,
+                end: 16,
+                sleep: 23
+            },
+            holidays: ['日', '土'],
+            mealSettings: {
+                breakfast: true,
+                breakHour: 12,
+                dinner: true
+            },
+            faceImageData: '',
+            roomImageData: '',
+            roomImages: { morning: '', evening: '', night: '' },
+            enableDayNightEffect: true
+        },
+        state: {
+            year: 1,
+            season: '春',
+            month: 3,
+            day: 1,
+            dayOfWeek: '日',
+            hour: 9,
+            currentAction: 'お菓子作りをして過ごしている',
+            actionType: 'hobby', 
+            currentHobby: 'お菓子作り',
+            hobbyBlockHours: 1,
+            hobbyTargetHours: 3,
+            currentSpeech: '「…おはよ。休日の朝はまだ少し眠いな。目を覚ますついでに、甘いクッキーでも焼くとしよう。」',
+            pendingThought: null,
+            lastTalkedTimeKey: ''
+        },
+        habits: createEmptyHabits(hobbies),
+        memories: [
+            {
+                dayKey: '1年目 春 3月1日 (日)',
+                dateStr: '1年目 春 3月1日 (日)',
+                text: '穏やかな春の休日。眠い目をこすりながら、甘いお菓子を焼いて静かに過ごした。'
+            }
+        ],
+        diary: [
+            {
+                dateStr: '1年目 春 3月1日 (日) 09:00',
+                text: '魔法学校の生徒・アルマの暮らしの観察を始めた。休日の朝からお菓子作りをしているようだ。'
+            }
+        ]
+    };
+}
+
+function createBlankCharacter(newId, defaultName) {
+    const hobbies = ['読書', '散歩'];
+    return {
+        profile: {
+            id: newId,
+            name: defaultName,
+            job: '',
+            workplace: '',
+            affiliation: '',
+            summary: '',
+            tone: '',
+            speechSamples: [],
+            likes: ['お茶'],
+            dislikes: [],
+            hobbies: hobbies,
+            lifeStyle: '社会人',
+            schedule: {
+                wake: 7,
+                start: 8,
+                end: 18,
+                sleep: 23
+            },
+            holidays: ['日', '土'],
+            mealSettings: {
+                breakfast: true,
+                breakHour: 12,
+                dinner: true
+            },
+            faceImageData: '',
+            roomImageData: '',
+            roomImages: { morning: '', evening: '', night: '' },
+            enableDayNightEffect: true
+        },
+        state: {
+            year: 1,
+            season: '春',
+            month: 3,
+            day: 1,
+            dayOfWeek: '日',
+            hour: 9,
+            currentAction: '読書をして過ごしている',
+            actionType: 'hobby',
+            currentHobby: '読書',
+            hobbyBlockHours: 1,
+            hobbyTargetHours: 3,
+            currentSpeech: `（${defaultName}は部屋で静かに読書をして過ごしているようだ）`,
+            pendingThought: null,
+            lastTalkedTimeKey: ''
+        },
+        habits: createEmptyHabits(hobbies),
+        memories: [
+            {
+                dayKey: '1年目 春 3月1日 (日)',
+                dateStr: '1年目 春 3月1日 (日)',
+                text: '穏やかな春の休日。部屋でゆっくりと時間を過ごした。'
+            }
+        ],
+        diary: [
+            {
+                dateStr: '1年目 春 3月1日 (日) 09:00',
+                text: `${defaultName}の暮らしの観察を始めた。`
+            }
+        ]
+    };
+}
+
+function getSeasonByMonth(month) {
+    if (month >= 3 && month <= 5) return '春';
+    if (month >= 6 && month <= 8) return '夏';
+    if (month >= 9 && month <= 11) return '秋';
+    return '冬';
+}
+
+/**
+ * 基準時刻 base から対象時刻 h までの経過時間（0〜23の円環時間）を返す
+ */
+function hoursSince(h, base) {
+    return (((h % 24) - (base % 24)) % 24 + 24) % 24;
+}
+
+/**
+ * 睡眠判定（24時間円環・終日睡眠・不眠24時間稼働対応）
+ */
+function isHourSleeping(hour, wake, sleep) {
+    if (wake === null) return true;
+    if (sleep === null) return false;
+    const awakeDuration = hoursSince(sleep, wake);
+    if (awakeDuration === 0) return false;
+    const elapsed = hoursSince(hour, wake);
+    return elapsed >= awakeDuration;
+}
+
+/**
+ * 勤務・学業時間中かどうかの判定（日またぎ・夜勤・24時間稼働対応）
+ */
+function isHourInWorkRange(hour, start, end) {
+    if (start === null || end === null) return false;
+    const workDuration = hoursSince(end, start);
+    if (workDuration === 0) return false;
+    const elapsed = hoursSince(hour, start);
+    return elapsed < workDuration;
+}
+
+function normalizeAndSanitizeCharacter(raw, fallbackId = '') {
+    const baseId = (raw && raw.profile && typeof raw.profile.id === 'string' && raw.profile.id.trim())
+        ? raw.profile.id.trim()
+        : (fallbackId || ('char_' + Date.now()));
+    const baseName = (raw && raw.profile && typeof raw.profile.name === 'string' && raw.profile.name.trim())
+        ? raw.profile.name.trim()
+        : '名無しの住人';
+
+    const blank = createBlankCharacter(baseId, baseName);
+    const rawProf = (raw && typeof raw.profile === 'object' && raw.profile) ? raw.profile : {};
+    const rawState = (raw && typeof raw.state === 'object' && raw.state) ? raw.state : {};
+    const rawSch = (rawProf.schedule && typeof rawProf.schedule === 'object') ? rawProf.schedule : {};
+    const rawMeal = (rawProf.mealSettings && typeof rawProf.mealSettings === 'object') ? rawProf.mealSettings : {};
+    const rawRoomImgs = (rawProf.roomImages && typeof rawProf.roomImages === 'object') ? rawProf.roomImages : {};
+
+    const cleanStrArray = (arr, fallbackArr, maxLen = 20) => {
+        if (!Array.isArray(arr)) return [...fallbackArr];
+        const filtered = arr.map(v => String(v ?? '').trim()).filter(Boolean);
+        return filtered.length > 0 ? filtered.slice(0, maxLen) : [...fallbackArr];
+    };
+
+    const hobbies = cleanStrArray(rawProf.hobbies, blank.profile.hobbies, 5);
+    const lifeStyle = Object.prototype.hasOwnProperty.call(LIFESTYLE_MODELS, rawProf.lifeStyle)
+        ? rawProf.lifeStyle
+        : '社会人';
+
+    // wake: null（終日睡眠）または 0〜23
+    let wake = 7;
+    if (rawSch.wake === null || rawSch.wake === 'null' || lifeStyle === '冬眠・終日睡眠') {
+        wake = null;
+    } else if (rawSch.wake !== undefined) {
+        const parsedWake = parseInt(rawSch.wake, 10);
+        wake = (Number.isFinite(parsedWake) && parsedWake >= 0 && parsedWake <= 23) ? parsedWake : 7;
+    }
+
+    // sleep: null（睡眠なし・24時間稼働）または 0〜29
+    let sleep = 23;
+    if (wake === null) {
+        sleep = 0;
+    } else if (rawSch.sleep === null || rawSch.sleep === 'null' || lifeStyle === '不眠・24時間稼働') {
+        sleep = null;
+    } else if (rawSch.sleep !== undefined) {
+        const parsedSleep = parseInt(rawSch.sleep, 10);
+        sleep = (Number.isFinite(parsedSleep) && parsedSleep >= 0 && parsedSleep <= 29) ? parsedSleep : 23;
+        if ((sleep % 24) === (wake % 24)) {
+            sleep = (wake + 16) % 24;
+        }
+    }
+
+    const noWorkStyles = ['無職', '冬眠・終日睡眠'];
+    let start = (rawSch.start === null || rawSch.start === 'null' || noWorkStyles.includes(lifeStyle) || wake === null)
+        ? null
+        : parseInt(rawSch.start, 10);
+    let end = (rawSch.end === null || rawSch.end === 'null' || noWorkStyles.includes(lifeStyle) || wake === null)
+        ? null
+        : parseInt(rawSch.end, 10);
+
+    if (start !== null && (!Number.isFinite(start) || start < 0 || start > 23)) start = 8;
+    if (end !== null && (!Number.isFinite(end) || end < 0 || end > 29)) end = 18;
+    if (start === null || end === null) {
+        start = null;
+        end = null;
+    } else if (wake !== null && sleep !== null) {
+        const awakeDur = hoursSince(sleep, wake);
+        if (awakeDur < 3) {
+            // 起きている時間が1〜2時間しかなく出勤・帰宅が物理的に入らない場合のみ予定なしにする
+            start = null;
+            end = null;
+        } else {
+            // 旧データ（例：wake 8 / start 8 や end >= sleep）で勤務予定が消えないよう自動補正する
+            let sOff = hoursSince(start, wake);
+            let eOff = hoursSince(end, wake);
+            if (sOff < 1 || sOff >= awakeDur - 1) {
+                sOff = 1;
+                start = (wake + sOff) % 24;
+            }
+            if (eOff <= sOff || eOff >= awakeDur) {
+                eOff = Math.min(awakeDur - 1, Math.max(sOff + 1, 9));
+                end = (wake + eOff) % 24;
+            }
+        }
+    } else if ((start % 24) === (end % 24)) {
+        end = (start + 8) % 24;
+    }
+
+    const breakfast = rawMeal.breakfast !== undefined ? Boolean(rawMeal.breakfast) : true;
+    const dinner = rawMeal.dinner !== undefined ? Boolean(rawMeal.dinner) : true;
+    let breakHour = 12;
+    if (rawMeal.breakHour === null || rawMeal.breakHour === 'null') {
+        breakHour = null;
+    } else if (rawMeal.breakHour !== undefined) {
+        const parsedBreak = parseInt(rawMeal.breakHour, 10);
+        breakHour = (Number.isFinite(parsedBreak) && parsedBreak >= 0 && parsedBreak <= 23) ? parsedBreak : 12;
+    }
+    if (breakHour !== null && (wake === null || (sleep !== null && breakHour === wake) || isHourSleeping(breakHour, wake, sleep))) {
+        breakHour = null;
+    }
+
+    const holidays = Array.isArray(rawProf.holidays)
+        ? rawProf.holidays.map(d => String(d ?? '').trim()).filter(d => DAYS_JP.includes(d))
+        : ['日', '土'];
+
+    const profile = {
+        id: baseId,
+        name: baseName,
+        job: typeof rawProf.job === 'string' ? rawProf.job.trim() : '',
+        workplace: typeof rawProf.workplace === 'string' ? rawProf.workplace.trim() : '',
+        affiliation: typeof rawProf.affiliation === 'string' ? rawProf.affiliation.trim() : '',
+        summary: typeof rawProf.summary === 'string' ? rawProf.summary.trim() : '',
+        tone: typeof rawProf.tone === 'string' ? rawProf.tone.trim() : '',
+        speechSamples: Array.isArray(rawProf.speechSamples)
+            ? rawProf.speechSamples.map(s => String(s ?? '').trim()).filter(Boolean).slice(0, 150)
+            : [],
+        likes: Array.isArray(rawProf.likes)
+            ? rawProf.likes.map(s => String(s ?? '').trim()).filter(Boolean).slice(0, 20)
+            : ['お茶'],
+        dislikes: Array.isArray(rawProf.dislikes)
+            ? rawProf.dislikes.map(s => String(s ?? '').trim()).filter(Boolean).slice(0, 20)
+            : [],
+        hobbies: hobbies,
+        lifeStyle: lifeStyle,
+        schedule: { wake, start, end, sleep },
+        holidays: holidays,
+        mealSettings: { breakfast, breakHour, dinner },
+        faceImageData: isSafeImageDataUrl(rawProf.faceImageData) ? rawProf.faceImageData.trim() : '',
+        roomImageData: isSafeImageDataUrl(rawProf.roomImageData) ? rawProf.roomImageData.trim() : '',
+        roomImages: {
+            morning: isSafeImageDataUrl(rawRoomImgs.morning) ? rawRoomImgs.morning.trim() : '',
+            evening: isSafeImageDataUrl(rawRoomImgs.evening) ? rawRoomImgs.evening.trim() : '',
+            night: isSafeImageDataUrl(rawRoomImgs.night) ? rawRoomImgs.night.trim() : ''
+        },
+        enableDayNightEffect: rawProf.enableDayNightEffect !== false
+    };
+
+    const year = (Number.isFinite(Number(rawState.year)) && Number(rawState.year) >= 1) ? Math.floor(Number(rawState.year)) : 1;
+    const month = (Number.isFinite(Number(rawState.month)) && Number(rawState.month) >= 1 && Number(rawState.month) <= 12)
+        ? Math.floor(Number(rawState.month))
+        : 3;
+    const day = (Number.isFinite(Number(rawState.day)) && Number(rawState.day) >= 1 && Number(rawState.day) <= 30)
+        ? Math.floor(Number(rawState.day))
+        : 1;
+    const hour = (Number.isFinite(Number(rawState.hour)) && Number(rawState.hour) >= 0 && Number(rawState.hour) <= 23)
+        ? Math.floor(Number(rawState.hour))
+        : 9;
+    const dayOfWeek = DAYS_JP.includes(rawState.dayOfWeek) ? rawState.dayOfWeek : '日';
+    const validActionTypes = ['sleep', 'morning', 'work', 'return', 'meal', 'hobby'];
+    const actionType = validActionTypes.includes(rawState.actionType) ? rawState.actionType : 'hobby';
+    const currentHobby = (typeof rawState.currentHobby === 'string' && hobbies.includes(rawState.currentHobby))
+        ? rawState.currentHobby
+        : (actionType === 'hobby' ? hobbies[0] : null);
+
+    const state = {
+        year,
+        season: getSeasonByMonth(month),
+        month,
+        day,
+        dayOfWeek,
+        hour,
+        currentAction: typeof rawState.currentAction === 'string' && rawState.currentAction.trim()
+            ? rawState.currentAction.trim()
+            : `${hobbies[0]}をして過ごしている`,
+        actionType,
+        currentHobby,
+        hobbyBlockHours: Number.isFinite(Number(rawState.hobbyBlockHours)) ? Math.max(0, Math.floor(Number(rawState.hobbyBlockHours))) : 1,
+        hobbyTargetHours: Number.isFinite(Number(rawState.hobbyTargetHours)) ? Math.max(2, Math.min(5, Math.floor(Number(rawState.hobbyTargetHours)))) : 3,
+        currentSpeech: typeof rawState.currentSpeech === 'string' && rawState.currentSpeech.trim()
+            ? rawState.currentSpeech.trim()
+            : blank.state.currentSpeech,
+        pendingThought: null,
+        lastTalkedTimeKey: typeof rawState.lastTalkedTimeKey === 'string' ? rawState.lastTalkedTimeKey : ''
+    };
+
+    const habits = createEmptyHabits(hobbies, (raw && typeof raw.habits === 'object') ? raw.habits : null);
+
+    const memories = Array.isArray(raw?.memories)
+        ? raw.memories
+            .filter(m => m && typeof m === 'object' && typeof m.text === 'string')
+            .map(m => ({
+                dayKey: String(m.dayKey || m.dateStr || ''),
+                dateStr: String(m.dateStr || m.dayKey || ''),
+                text: String(m.text).trim(),
+                lockedByInteraction: Boolean(m.lockedByInteraction)
+            }))
+            .slice(0, 60)
+        : blank.memories;
+
+    const diary = Array.isArray(raw?.diary)
+        ? raw.diary
+            .filter(d => d && typeof d === 'object' && typeof d.text === 'string')
+            .map(d => ({
+                dateStr: String(d.dateStr || ''),
+                text: String(d.text).trim()
+            }))
+            .slice(0, 200)
+        : blank.diary;
+
+    return { profile, state, habits, memories, diary };
+}
+
+function getTimeKey(state) {
+    return `${state.year}-${state.month}-${state.day}-${state.hour}`;
+}
+
+function getDayKey(state) {
+    return `${state.year}年目 ${state.season} ${state.month}月${state.day}日 (${state.dayOfWeek})`;
+}
+
+function isCharacterHoliday(profile, dayOfWeek) {
+    if (Array.isArray(profile.holidays)) {
+        return profile.holidays.includes(dayOfWeek);
+    }
+    return (dayOfWeek === '土' || dayOfWeek === '日');
+}
+
+function rollHobbyTargetHours(hasScheduledWork) {
+    if (!hasScheduledWork) {
+        return 2 + Math.floor(Math.random() * 3);
+    }
+    return 2 + Math.floor(Math.random() * 2);
+}
+
+function upsertDailyMemory(charObj, newText, isPriorityEvent = false) {
+    const { state } = charObj;
+    if (!Array.isArray(charObj.memories)) charObj.memories = [];
+    const dayKey = getDayKey(state);
+    const existingIndex = charObj.memories.findIndex(m => (m.dayKey || m.dateStr) === dayKey);
+
+    if (existingIndex !== -1) {
+        const entry = charObj.memories[existingIndex];
+        if (isPriorityEvent) {
+            if (entry.lockedByInteraction && entry.text && !entry.text.includes(newText)) {
+                const combined = `${entry.text} ${newText}`;
+                entry.text = combined.length <= 160 ? combined : newText;
+            } else {
+                entry.text = newText;
+            }
+            entry.dateStr = dayKey;
+            entry.dayKey = dayKey;
+            entry.lockedByInteraction = true;
+        } else if (!entry.lockedByInteraction) {
+            entry.text = newText;
+            entry.dateStr = dayKey;
+            entry.dayKey = dayKey;
+        }
+    } else {
+        charObj.memories.unshift({
+            dayKey: dayKey,
+            dateStr: dayKey,
+            text: newText,
+            lockedByInteraction: Boolean(isPriorityEvent)
+        });
+        if (charObj.memories.length > 60) {
+            charObj.memories.pop();
+        }
+    }
+}
+
+/**
+ * 起床1時間後の「独立朝食枠（(wake+1)%24）」が発生するかどうかを判定して時刻を返す
+ * - 睡眠あり、かつ覚醒時間が3時間以上あり、起床1時間後が出勤や昼休憩と重ならない場合に独立枠となる
+ */
+function resolveStandaloneBreakfastHour(sch, meal, hasScheduledWork) {
+    if (!meal || !meal.breakfast) return null;
+    if (sch.wake === null || sch.sleep === null) return null;
+
+    const awakeDuration = hoursSince(sch.sleep, sch.wake);
+    if (awakeDuration < 3) return null;
+
+    const startOffset = (hasScheduledWork && sch.start !== null) ? hoursSince(sch.start, sch.wake) : null;
+    const nextHourAfterWake = (sch.wake + 1) % 24;
+
+    if (hasScheduledWork && startOffset !== null && startOffset <= 1) return null;
+    if (meal.breakHour !== null && meal.breakHour === nextHourAfterWake) return null;
+    if (isHourSleeping(nextHourAfterWake, sch.wake, sch.sleep)) return null;
+
+    return nextHourAfterWake;
+}
+
+/**
+ * 夕食時刻を算出する（24時間円環・夜行性・過眠・不眠対応）
+ * - 起床1時間後の独立朝食枠（例：18時起床時の19時）と衝突しないよう除外判定を行う
+ */
+function resolveDailyDinnerHour(sch, meal, hasScheduledWork) {
+    if (!meal || !meal.dinner) return null;
+    if (sch.wake === null) return null; // 終日睡眠時は食事なし
+
+    const awakeDuration = (sch.sleep === null) ? 24 : hoursSince(sch.sleep, sch.wake);
+    if (awakeDuration <= 2) return null;
+
+    const standaloneBreakfastHour = resolveStandaloneBreakfastHour(sch, meal, hasScheduledWork);
+    const endMod = (sch.end !== null && sch.end !== undefined) ? (sch.end % 24) : null;
+
+    const isCandidateValid = (h) => {
+        if (h === null || h < 0 || h >= 24) return false;
+        if (isHourSleeping(h, sch.wake, sch.sleep)) return false;
+        if (sch.sleep !== null && h === sch.wake) return false;
+        if (standaloneBreakfastHour !== null && h === standaloneBreakfastHour) return false;
+        if (meal.breakHour !== null && h === meal.breakHour) return false;
+        if (hasScheduledWork && isHourInWorkRange(h, sch.start, sch.end)) return false;
+        return true;
+    };
+
+    // 第一候補：19:00（ただし勤務後が19:00以降になる場合は帰宅直後または帰宅時）
+    let primary = 19;
+    if (hasScheduledWork && endMod !== null) {
+        if (sch.sleep !== null) {
+            const endOff = hoursSince(endMod, sch.wake);
+            const off19 = hoursSince(19, sch.wake);
+            if (endOff >= off19) {
+                const afterEnd = (endMod + 1) % 24;
+                primary = !isHourSleeping(afterEnd, sch.wake, sch.sleep) ? afterEnd : endMod;
+            }
+        } else if (isHourInWorkRange(19, sch.start, sch.end) || endMod === 19) {
+            primary = (endMod + 1) % 24;
+        }
+    }
+
+    if (isCandidateValid(primary)) {
+        return primary;
+    }
+
+    // 夜行性などで19:00が睡眠中・起床直後（朝食枠）の場合：帰宅後や就寝前の空き時間を探す
+    const fallbackCandidates = [];
+    if (hasScheduledWork && endMod !== null) {
+        fallbackCandidates.push((endMod + 1) % 24, endMod);
+    }
+    if (sch.sleep !== null) {
+        const sleepMod = sch.sleep % 24;
+        fallbackCandidates.push((sleepMod - 2 + 24) % 24, (sleepMod - 1 + 24) % 24);
+    }
+
+    for (const cand of fallbackCandidates) {
+        if (isCandidateValid(cand)) {
+            return cand;
+        }
+    }
+    return null;
+}
+
+function detectMatchingMealPresetKey(meal) {
+    if (!meal) return 'regular';
+    const b = Boolean(meal.breakfast);
+    const d = Boolean(meal.dinner);
+    const brk = (meal.breakHour === undefined) ? 12 : meal.breakHour;
+
+    for (const [key, preset] of Object.entries(MEAL_PRESETS)) {
+        if (preset.breakfast === b && preset.dinner === d && preset.breakHour === brk) {
+            return key;
+        }
+    }
+    return '';
+}
+
+function formatMealSummaryText(meal) {
+    if (!meal) return '🍽️ 現在の食生活：規則正しい（朝食あり / 12:00休憩 / 夕食あり）';
+    const parts = [];
+    if (meal.breakfast) parts.push('朝食あり');
+    if (meal.breakHour !== null && meal.breakHour !== undefined) {
+        parts.push(`${String(meal.breakHour).padStart(2, '0')}:00休憩`);
+    }
+    if (meal.dinner) parts.push('夕食あり');
+    if (parts.length === 0) {
+        return '🍽️ 現在の食生活：食事・休憩なし（人外・没頭スタイル）';
+    }
+    if (!meal.breakfast && meal.breakHour === null && meal.dinner) {
+        return '🍽️ 現在の食生活：不摂生・1日1食（夕食のみ）';
+    }
+    if (!meal.breakfast && meal.breakHour !== null && meal.dinner) {
+        return `🍽️ 現在の食生活：朝抜き（${String(meal.breakHour).padStart(2, '0')}:00休憩 / 夕食あり）`;
+    }
+    return `🍽️ 現在の食生活：${parts.join(' / ')}`;
+}
+
+function drawWeightedHobby(profile, habits, dayOfWeek) {
+    const hobbies = (profile.hobbies && profile.hobbies.length > 0) ? profile.hobbies : ['読書'];
+    const dayRecord = (habits && habits[dayOfWeek]) ? habits[dayOfWeek] : {};
+
+    const counts = hobbies.map(hobby => dayRecord[hobby] || 0);
+    const minCount = counts.length > 0 ? Math.min(...counts) : 0;
+
+    const pool = hobbies.map(hobby => {
+        const rawCount = dayRecord[hobby] || 0;
+        const diffCount = Math.min(Math.max(0, rawCount - minCount), HABIT_WEIGHT_CAP);
+        return { hobby, weight: 1 + diffCount * 0.4 };
+    });
+
+    const totalWeight = pool.reduce((sum, item) => sum + item.weight, 0);
+    let r = Math.random() * totalWeight;
+    for (const item of pool) {
+        if (r < item.weight) {
+            return item.hobby;
+        }
+        r -= item.weight;
+    }
+    return hobbies[0];
+}
+
+function incrementInternalHabit(habits, dayOfWeek, hobby) {
+    if (!habits[dayOfWeek]) habits[dayOfWeek] = {};
+    if (typeof habits[dayOfWeek][hobby] !== 'number') {
+        habits[dayOfWeek][hobby] = 0;
+    }
+    habits[dayOfWeek][hobby] += 1;
+}
+
+/**
+ * 観察メモの生成（5回 / 10回 / 20回の3段階成長演出）
+ */
+function buildObservationNoteText(habits, currentDayOfWeek) {
+    if (!habits) return { text: 'まだ目立った習慣は見られない。', isEmpty: true };
+
+    const established = [];
+    DAYS_JP.forEach(day => {
+        const dayMap = habits[day] || {};
+        let bestHobby = null;
+        let bestCount = 0;
+        Object.entries(dayMap).forEach(([hobby, count]) => {
+            if (count >= HABIT_DISPLAY_THRESHOLD && count > bestCount) {
+                bestCount = count;
+                bestHobby = hobby;
+            }
+        });
+        if (bestHobby) {
+            established.push({ day, hobby: bestHobby, count: bestCount });
+        }
+    });
+
+    if (established.length === 0) {
+        return { text: 'まだ目立った習慣は見られない。', isEmpty: true };
+    }
+
+    established.sort((a, b) => {
+        if (a.day === currentDayOfWeek && b.day !== currentDayOfWeek) return -1;
+        if (b.day === currentDayOfWeek && a.day !== currentDayOfWeek) return 1;
+        return b.count - a.count;
+    });
+
+    const lines = established.slice(0, 2).map(item => {
+        if (item.count >= 20) {
+            return `${item.day}曜日の${item.hobby}は、もはや生活の一部になっているようだ。`;
+        }
+        if (item.count >= 10) {
+            return `${item.day}曜日の${item.hobby}がすっかり板についてきたようだ。`;
+        }
+        return `${item.day}曜日は${item.hobby}をして過ごすことが多いようだ。`;
+    });
+
+    return { text: lines.join(' '), isEmpty: false };
+}
+
+/**
+ * オフライン・フォールバック時の時間帯・状況・季節キーワード反応
+ */
+function pickContextualSample(profile, state, contextType = 'monologue') {
+    const rawSamples = Array.isArray(profile.speechSamples) ? profile.speechSamples : [];
+    const samples = rawSamples
+        .map(s => String(s || '').replace(/^[「『"“”']+/, '').replace(/[」』"“”']+$/, '').trim())
+        .filter(Boolean);
+    if (samples.length === 0) return '';
+
+    const hour = state.hour;
+    const season = state.season || '春';
+    const isMorning = (hour >= 5 && hour <= 10) || state.actionType === 'morning';
+    const isDaytime = (hour >= 11 && hour <= 16);
+    const isEvening = (hour >= 17 && hour <= 19) || state.actionType === 'return';
+    const isNight = (hour >= 20 || hour <= 4);
+
+    const seasonPriorityMap = {
+        '春': ['春', '桜', '暖か', 'ぽかぽか', '新緑', '花'],
+        '夏': ['夏', '暑', '日差し', '冷たい', 'アイス', '風鈴', '汗'],
+        '秋': ['秋', '紅葉', '涼し', '夜長', '落ち葉'],
+        '冬': ['冬', '寒', '雪', '冷え', '温か', 'あたたか', 'コタツ', 'ストーブ']
+    };
+    const seasonAvoidMap = {
+        '春': ['猛暑', '雪が', '凍え', '冬場'],
+        '夏': ['寒い', '雪が', '凍え', 'ストーブ', '冬場'],
+        '秋': ['猛暑', '雪が', '冬場'],
+        '冬': ['暑い', '猛暑', '汗だく']
+    };
+
+    let priorityKeywords = [];
+    let avoidKeywords = [...(seasonAvoidMap[season] || [])];
+
+    if (contextType === 'talk_busy' || state.actionType === 'work') {
+        priorityKeywords = ['手が離せ', '忙し', '集中', '取り込', '仕事', '作業', '調合', '講義', '後ほど', '後で', '邪魔', '今ね'];
+        avoidKeywords.push('おやすみ', 'もう寝', 'おはよ');
+    } else if (contextType === 'talk_free') {
+        priorityKeywords = ['いらして', '来た', '来てくれ', '座る', '座り', 'お茶', '紅茶', 'お菓子', 'スコーン', 'クッキー', 'お話し', 'ようこそ', 'どうした', '用事', '君か'];
+        avoidKeywords.push('手が離せ', '話しかけんな', '話しかけないで', '邪魔しないで');
+    } else if (state.actionType === 'meal') {
+        priorityKeywords = ['食事', 'ご飯', 'ごはん', '飯', '朝ごはん', '朝食', '昼食', 'ランチ', 'お弁当', '夕食', '腹', '糖分', 'おいしい', '美味しい', '甘い', 'クッキー', 'スコーン', 'お菓子', 'お茶', '紅茶', 'お腹', '食べ', '味見', '休憩', '一息'];
+        avoidKeywords.push('手が離せ', 'おやすみ', 'もう寝');
+    } else if (isMorning) {
+        priorityKeywords = ['朝', 'おはよ', 'ごきげんよう', '天気', '起き', '眠い', '寝かせ', '今日も', ...(seasonPriorityMap[season] || [])];
+        avoidKeywords.push('夜も更け', 'おやすみ', 'もう寝', '日も暮れ', 'ただいま', '帰');
+    } else if (state.actionType === 'return') {
+        priorityKeywords = ['ただいま', '戻', '疲れ', '休憩', '一息', 'お茶', '紅茶', '甘いもの', '終わ'];
+        avoidKeywords.push('朝', 'おはよ');
+    } else if (isNight) {
+        priorityKeywords = ['夜', 'もうこんな時間', '寝る', '眠る', 'おやすみ', '休む', '日も暮れ', '今日はここまで', '良い一日', 'また明日', '疲れ', ...(seasonPriorityMap[season] || [])];
+        avoidKeywords.push('朝は', 'おはよ');
+    } else if (isEvening) {
+        priorityKeywords = ['夕', '日も暮れ', 'ただいま', '疲れ', '休憩', 'お茶', '紅茶', 'お菓子', 'お腹'];
+        avoidKeywords.push('朝は', 'おはよ', 'おやすみ');
+    } else if (isDaytime) {
+        const hobby = state.currentHobby || '';
+        const likes = Array.isArray(profile.likes) ? profile.likes : [];
+        priorityKeywords = [hobby, ...likes, ...(seasonPriorityMap[season] || []), 'ガラクタ', 'クッキー', '術式', '棚', '魔導', '静か', '天気', 'お茶', '紅茶', '読書', '研究', '面白', '楽しい', '順調', '休憩'].filter(Boolean);
+        avoidKeywords.push('朝は', 'おはよ', '夜も更け', 'おやすみ', 'もう寝', '日も暮れ');
+    }
+
+    const safePool = samples.filter(s => !avoidKeywords.some(kw => kw && s.includes(kw)));
+    const basePool = safePool.length > 0 ? safePool : samples;
+
+    if (priorityKeywords.length > 0) {
+        const matched = basePool.filter(s => priorityKeywords.some(kw => kw && s.includes(kw)));
+        if (matched.length > 0) {
+            return matched[Math.floor(Math.random() * matched.length)];
+        }
+    }
+
+    return basePool[Math.floor(Math.random() * basePool.length)];
+}
+
+function generateContextualMonologue(profile, state) {
+    const name = profile.name || '住人';
+    const likes = (profile.likes && profile.likes.length > 0) ? profile.likes : ['飲み物'];
+    const fav = likes[Math.floor(Math.random() * likes.length)];
+    const workplace = profile.workplace || profile.job || '予定先';
+    const season = state.season || '春';
+    const seasonAtmosphereMap = {
+        '春': 'やわらかな春の空気の中、',
+        '夏': '季節の陽気を感じながら、',
+        '秋': '落ち着いた秋の気配の中、',
+        '冬': '静かな冬の空気の中、部屋を暖かくして'
+    };
+    const seasonAtmosphere = seasonAtmosphereMap[season] || '';
+
+    if (state.actionType === 'sleep') {
+        const lines = [
+            `（${name}は静かな寝息を立てて深く眠っているようだ）`,
+            `（明日に備えてゆっくり休んでいる。部屋は静まり返っている）`,
+            `（穏やかな表情で眠っている。そっとしておこう）`
+        ];
+        return lines[Math.floor(Math.random() * lines.length)];
+    }
+
+    const sample = pickContextualSample(profile, state, 'monologue');
+
+    if (state.actionType === 'morning') {
+        const timeWord = (state.hour >= 5 && state.hour <= 10) ? `${season}の朝の光の中、` : '目を覚まして、';
+        if (sample) {
+            return `「${sample}」\n（${timeWord}身支度を整えながら${fav}を用意しているようだ）`;
+        }
+        return `（${timeWord}${name}は身支度を整えているようだ）`;
+    }
+
+    if (state.actionType === 'meal') {
+        if (sample) {
+            return `「${sample}」\n（${fav}などを楽しみながら、${state.currentAction}ようだ）`;
+        }
+        return `（${name}は${fav}を用意して、${state.currentAction}ようだ）`;
+    }
+
+    if (state.actionType === 'work') {
+        if (sample) {
+            return `「${sample}」\n（${workplace}での予定に集中して取り組んでいるようだ）`;
+        }
+        return `（現在は${state.currentAction}の時間だ。集中して取り組んでいる様子がうかがえる）`;
+    }
+
+    if (state.actionType === 'return') {
+        if (sample) {
+            return `「${sample}」\n（今日の予定を終えて帰宅し、${fav}で一息ついている）`;
+        }
+        return `（今日の予定を終えて部屋に戻り、${fav}を用意してほっと一息ついているようだ）`;
+    }
+
+    if (state.actionType === 'hobby') {
+        const hobby = state.currentHobby || '休息';
+        if (sample) {
+            return `「${sample}」\n（${seasonAtmosphere}${fav}を片手に、${hobby}をして穏やかな時間を過ごしている）`;
+        }
+        return `（${seasonAtmosphere}${name}は${fav}を楽しみながら、${hobby}をして静かに過ごしているようだ）`;
+    }
+
+    return sample ? `「${sample}」` : `（${name}は穏やかに過ごしている）`;
+}
+
+function maybeCreateThoughtEvent(profile, state) {
+    if (state.actionType !== 'hobby') {
+        state.pendingThought = null;
+        return;
+    }
+    if (state.pendingThought) return;
+    if (Math.random() < 0.14) {
+        const name = profile.name || '住人';
+        const hobbies = (profile.hobbies && profile.hobbies.length > 0) ? profile.hobbies : ['読書'];
+        const likes = (profile.likes && profile.likes.length > 0) ? profile.likes : ['お茶'];
+        const h1 = hobbies[0];
+        const h2 = hobbies[1] || '休息';
+        const l1 = likes[0];
+
+        state.pendingThought = {
+            prompt: `（${name}は少し考え事をしているようだ。このまま『${h1}』を続けるか、それとも『${l1}』を用意して『${h2}』にするか迷っているように見える）`,
+            options: [
+                { label: `${h1}をじっくり続けるのが良さそう`, hobby: h1, reply: `（こちらの助言に頷き、もう少し『${h1}』を続けることにしたようだ）` },
+                { label: `${l1}で一息ついて${h2}にするのはどう？`, hobby: h2, reply: `（気分転換に『${l1}』を用意して、『${h2}』に切り替えることにしたようだ）` }
+            ]
+        };
+    }
+}
+
+/**
+ * 設定変更時や時刻進行時に、現在の時刻・曜日のスケジュールに合わせて行動状態を更新する
+ * （24時間円環・過眠・終日睡眠・不眠24時間稼働・夜行性すべてに対応）
+ */
+function applyScheduleForCurrentHour(charObj, isHourlyStep = false) {
+    const { profile, state, habits } = charObj;
+    const sch = profile.schedule || { wake: 7, start: 8, end: 18, sleep: 23 };
+    const meal = profile.mealSettings || { breakfast: true, breakHour: 12, dinner: true };
+    const isHoliday = isCharacterHoliday(profile, state.dayOfWeek);
+    const model = LIFESTYLE_MODELS[profile.lifeStyle] || LIFESTYLE_MODELS['社会人'];
+    const noWorkStyles = ['無職', '冬眠・終日睡眠'];
+    const hasScheduledWork = (!noWorkStyles.includes(profile.lifeStyle) && sch.wake !== null && sch.start !== null && sch.end !== null && !isHoliday);
+
+    const isSleepless = (sch.wake !== null && sch.sleep === null);
+    const endMod = (hasScheduledWork && sch.end !== null) ? (sch.end % 24) : null;
+
+    // 独立朝食枠と夕食枠の解決（互いに衝突しないよう統一ヘルパーを使用）
+    const standaloneBreakfastHour = resolveStandaloneBreakfastHour(sch, meal, hasScheduledWork);
+    const hasMorningMargin = (standaloneBreakfastHour !== null);
+    const dinnerHour = resolveDailyDinnerHour(sch, meal, hasScheduledWork);
+
+    // 1. 睡眠中判定（終日睡眠を含む）
+    if (isHourSleeping(state.hour, sch.wake, sch.sleep)) {
+        state.actionType = 'sleep';
+        state.currentHobby = null;
+        state.hobbyBlockHours = 0;
+        state.currentAction = '就寝中';
+        state.pendingThought = null;
+        return;
+    }
+
+    // 2. 起床時刻（睡眠があるキャラのみ）または 24時間稼働キャラの朝食時刻
+    if (!isSleepless && sch.wake !== null && state.hour === sch.wake) {
+        state.actionType = 'morning';
+        state.currentHobby = null;
+        state.hobbyBlockHours = 0;
+        state.currentAction = (meal.breakfast && !hasMorningMargin) ? '起床・朝食をとっている' : '起床・朝の支度';
+        state.pendingThought = null;
+        return;
+    }
+    if (isSleepless && meal.breakfast && sch.wake !== null && state.hour === sch.wake && !(hasScheduledWork && isHourInWorkRange(state.hour, sch.start, sch.end))) {
+        state.actionType = 'meal';
+        state.currentAction = '朝食をとり、朝のひとときを過ごしている';
+        state.pendingThought = null;
+        return;
+    }
+
+    // 3. 起床1時間後の独立朝食枠
+    if (standaloneBreakfastHour !== null && state.hour === standaloneBreakfastHour) {
+        state.actionType = 'meal';
+        state.currentHobby = null;
+        state.hobbyBlockHours = 0;
+        state.currentAction = '朝食をとり、朝のひとときを過ごしている';
+        state.pendingThought = null;
+        return;
+    }
+
+    // 4. メイン休憩・昼食時間
+    if (meal.breakHour !== null && state.hour === meal.breakHour) {
+        state.actionType = 'meal';
+        const isLunchTime = (state.hour >= 11 && state.hour <= 14);
+        if (hasScheduledWork && isHourInWorkRange(state.hour, sch.start, sch.end)) {
+            state.currentAction = isLunchTime ? '昼休憩・昼食をとっている' : '仕事の合間に休憩・軽食をとっている';
+        } else {
+            state.currentAction = isLunchTime ? '昼食・休憩をとっている' : '休憩・お茶の時間を過ごしている';
+        }
+        state.pendingThought = null;
+        return;
+    }
+
+    // 5. 仕事・学業・家事の活動時間
+    if (hasScheduledWork && isHourInWorkRange(state.hour, sch.start, sch.end)) {
+        state.actionType = 'work';
+        state.currentHobby = null;
+        state.hobbyBlockHours = 0;
+        state.currentAction = model.activeAction || '勤務中';
+        state.pendingThought = null;
+        return;
+    }
+
+    // 6. 帰宅・終了時刻
+    if (hasScheduledWork && endMod !== null && state.hour === endMod) {
+        if (dinnerHour !== null && dinnerHour === endMod) {
+            state.actionType = 'meal';
+            state.currentHobby = null;
+            state.hobbyBlockHours = 0;
+            state.currentAction = '帰宅・夕食をとっている';
+        } else {
+            state.actionType = 'return';
+            state.currentHobby = null;
+            state.hobbyBlockHours = 0;
+            state.currentAction = '帰宅・一息ついている';
+        }
+        state.pendingThought = null;
+        return;
+    }
+
+    // 7. 夕食時刻
+    if (dinnerHour !== null && state.hour === dinnerHour) {
+        state.actionType = 'meal';
+        state.currentAction = '夕食をとり、くつろいでいる';
+        state.pendingThought = null;
+        return;
+    }
+
+    // 8. 自由時間（趣味の継続ブロック）
+    if (!isHourlyStep) {
+        if (!state.currentHobby || !profile.hobbies.includes(state.currentHobby)) {
+            state.currentHobby = drawWeightedHobby(profile, habits, state.dayOfWeek);
+            state.hobbyBlockHours = 1;
+            state.hobbyTargetHours = rollHobbyTargetHours(hasScheduledWork);
+        }
+        state.actionType = 'hobby';
+        state.currentAction = `${state.currentHobby}をして過ごしている`;
+        return;
+    }
+
+    const targetHours = state.hobbyTargetHours || 3;
+    const nextBlockHours = (state.actionType === 'hobby' ? (state.hobbyBlockHours || 0) : 0) + 1;
+    const canResumePreviousHobby = (
+        state.actionType !== 'hobby' &&
+        state.currentHobby &&
+        profile.hobbies &&
+        profile.hobbies.includes(state.currentHobby) &&
+        (state.hobbyBlockHours || 0) > 0 &&
+        (state.hobbyBlockHours || 0) < targetHours
+    );
+
+    if (canResumePreviousHobby) {
+        state.actionType = 'hobby';
+        state.hobbyBlockHours = (state.hobbyBlockHours || 1) + 1;
+        state.currentAction = `${state.currentHobby}をして過ごしている`;
+    } else if (state.actionType !== 'hobby' || !state.currentHobby || !profile.hobbies.includes(state.currentHobby) || nextBlockHours > targetHours) {
+        const chosenHobby = drawWeightedHobby(profile, habits, state.dayOfWeek);
+        state.actionType = 'hobby';
+        state.currentHobby = chosenHobby;
+        state.hobbyBlockHours = 1;
+        state.hobbyTargetHours = rollHobbyTargetHours(hasScheduledWork);
+        state.currentAction = `${chosenHobby}をして過ごしている`;
+        incrementInternalHabit(habits, state.dayOfWeek, chosenHobby);
+        maybeCreateThoughtEvent(profile, state);
+
+        const likes = (profile.likes && profile.likes.length > 0) ? profile.likes : ['お茶'];
+        const fav = likes[Math.floor(Math.random() * likes.length)];
+        const timeLabel = isHoliday ? '休日の自由な時間に' : '空いた時間に';
+        upsertDailyMemory(
+            charObj,
+            `${timeLabel}、${fav}を楽しみながら${chosenHobby}をして静かに過ごした。`,
+            false
+        );
+    } else {
+        state.actionType = 'hobby';
+        state.hobbyBlockHours = nextBlockHours;
+        state.currentAction = `${state.currentHobby}をして過ごしている`;
+    }
+}
+
+function advanceOneHourStep(charObj) {
+    const { profile, state } = charObj;
+    const prevAction = state.currentAction;
+    const prevDay = state.day;
+
+    state.hour += 1;
+    if (state.hour >= 24) {
+        state.hour = 0;
+        state.day += 1;
+        const dowIdx = DAYS_JP.indexOf(state.dayOfWeek);
+        state.dayOfWeek = DAYS_JP[(dowIdx + 1) % 7];
+
+        if (state.day > 30) {
+            state.day = 1;
+            state.month += 1;
+            if (state.month > 12) {
+                state.month = 1;
+                state.year += 1;
+            }
+            state.season = getSeasonByMonth(state.month);
+        }
+    }
+
+    applyScheduleForCurrentHour(charObj, true);
+
+    if (state.currentAction !== prevAction || state.day !== prevDay) {
+        state.currentSpeech = generateContextualMonologue(profile, state);
+        state.needsLLMUpdate = true;
+    }
+}
+
+function formatStateDateTime(state) {
+    const hh = String(state.hour).padStart(2, '0');
+    return `${state.year}年目 ${state.season} ${state.month}月${state.day}日 (${state.dayOfWeek}) ${hh}:00`;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    let charactersMap = {};
+    let activeCharId = '';
+    let llmConfig = createDefaultLlmConfig();
+    let deleteConfirmStep = false;
+    let resetConfirmStep = false;
+    let hasNotifiedGeminiAuthIssue = false;
+
+    function resetDeleteButtonState() {
+        deleteConfirmStep = false;
+        const btn = document.getElementById('btnDeleteCharacter');
+        if (btn) btn.textContent = '現在の住人を削除';
+    }
+
+    function clearThoughtChoicesUI() {
+        const choicesEl = document.getElementById('uiDialogueChoices');
+        if (choicesEl) {
+            choicesEl.innerHTML = '';
+            choicesEl.classList.remove('active');
+        }
+    }
+
+    function loadStorage() {
+        try {
+            const savedLlm = localStorage.getItem(STORAGE_KEY_LLM);
+            if (savedLlm) {
+                const parsedLlm = JSON.parse(savedLlm);
+                llmConfig = { ...createDefaultLlmConfig(), ...parsedLlm };
+                if (llmConfig.provider === 'gemini' && !(llmConfig.geminiApiKey || '').trim()) {
+                    llmConfig.provider = 'offline';
+                }
+            }
+        } catch (e) {
+            llmConfig = createDefaultLlmConfig();
+        }
+
+        try {
+            const savedChars = localStorage.getItem(STORAGE_KEY_ALL);
+            const savedActive = localStorage.getItem(STORAGE_KEY_ACTIVE);
+            if (savedChars) {
+                const parsed = JSON.parse(savedChars);
+                if (parsed && typeof parsed === 'object') {
+                    charactersMap = {};
+                    Object.entries(parsed).forEach(([key, val]) => {
+                        const normalized = normalizeAndSanitizeCharacter(val, key);
+                        if (normalized.profile.id === 'char_alma_default' && normalized.profile.job === '結晶学者') {
+                            // 旧デフォルトのアルマ（結晶学者）を検出した場合：
+                            // 進行状況（state）・観察日記（diary）・思い出（memories）・習慣（habits）・登録画像はすべて引き継ぎ、プロフィール設定のみ新アルマへ更新する
+                            const freshAlma = createDefaultCharacterAlma();
+                            normalized.profile = {
+                                ...freshAlma.profile,
+                                faceImageData: normalized.profile.faceImageData,
+                                roomImageData: normalized.profile.roomImageData,
+                                roomImages: normalized.profile.roomImages,
+                                enableDayNightEffect: normalized.profile.enableDayNightEffect
+                            };
+                            normalized.habits = createEmptyHabits(freshAlma.profile.hobbies, normalized.habits);
+                            applyScheduleForCurrentHour(normalized, false);
+                            charactersMap[normalized.profile.id] = normalized;
+                        } else {
+                            charactersMap[normalized.profile.id] = normalized;
+                        }
+                    });
+                }
+            }
+            if (!charactersMap || Object.keys(charactersMap).length === 0) {
+                const alma = createDefaultCharacterAlma();
+                charactersMap = { [alma.profile.id]: alma };
+                activeCharId = alma.profile.id;
+                saveStorage();
+            } else {
+                activeCharId = (savedActive && charactersMap[savedActive])
+                    ? savedActive
+                    : Object.keys(charactersMap)[0];
+            }
+        } catch (e) {
+            const alma = createDefaultCharacterAlma();
+            charactersMap = { [alma.profile.id]: alma };
+            activeCharId = alma.profile.id;
+        }
+    }
+
+    function saveStorage() {
+        try {
+            localStorage.setItem(STORAGE_KEY_ALL, JSON.stringify(charactersMap));
+            localStorage.setItem(STORAGE_KEY_ACTIVE, activeCharId);
+            localStorage.setItem(STORAGE_KEY_LLM, JSON.stringify(llmConfig));
+            return true;
+        } catch (e) {
+            showToast('保存容量の上限に達したため保存できませんでした。不要な画像やデータを整理してください');
+            return false;
+        }
+    }
+
+    function getActiveChar() {
+        return charactersMap[activeCharId];
+    }
+
+    function showToast(message) {
+        const el = document.getElementById('uiToast');
+        el.textContent = message;
+        el.classList.add('show');
+        clearTimeout(el._timer);
+        el._timer = setTimeout(() => {
+            el.classList.remove('show');
+        }, 2800);
+    }
+
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    /**
+     * スケジュール選択プルダウンを24時間＋日またぎ（翌05:00まで）＋睡眠なし・終日睡眠に対応させる
+     */
+    function initScheduleSelects() {
+        const formatHourOption = (h) => {
+            if (h < 24) return `${String(h).padStart(2, '0')}:00`;
+            return `${String(h).padStart(2, '0')}:00 (翌${String(h - 24).padStart(2, '0')}:00)`;
+        };
+
+        // 起床時間（00:00〜23:00 ＋ 終日睡眠）
+        const selWake = document.getElementById('selWake');
+        selWake.innerHTML = '';
+        const optAllSleep = document.createElement('option');
+        optAllSleep.value = 'null';
+        optAllSleep.textContent = 'なし（1日中眠っている）';
+        selWake.appendChild(optAllSleep);
+        for (let h = 0; h <= 23; h++) {
+            const opt = document.createElement('option');
+            opt.value = String(h);
+            opt.textContent = formatHourOption(h);
+            selWake.appendChild(opt);
+        }
+
+        // 出勤・開始（なし ＋ 00:00〜23:00）
+        const selStart = document.getElementById('selStart');
+        selStart.innerHTML = '';
+        const optNoStart = document.createElement('option');
+        optNoStart.value = 'null';
+        optNoStart.textContent = 'なし（自由時間）';
+        selStart.appendChild(optNoStart);
+        for (let h = 0; h <= 23; h++) {
+            const opt = document.createElement('option');
+            opt.value = String(h);
+            opt.textContent = formatHourOption(h);
+            selStart.appendChild(opt);
+        }
+
+        // 帰宅・終了（なし ＋ 00:00〜29:00）
+        const selEnd = document.getElementById('selEnd');
+        selEnd.innerHTML = '';
+        const optNoEnd = document.createElement('option');
+        optNoEnd.value = 'null';
+        optNoEnd.textContent = 'なし（自由時間）';
+        selEnd.appendChild(optNoEnd);
+        for (let h = 0; h <= 29; h++) {
+            const opt = document.createElement('option');
+            opt.value = String(h);
+            opt.textContent = formatHourOption(h);
+            selEnd.appendChild(opt);
+        }
+
+        // 就寝時間（なし：24時間稼働 ＋ 00:00〜29:00）
+        const selSleep = document.getElementById('selSleep');
+        selSleep.innerHTML = '';
+        const optNoSleep = document.createElement('option');
+        optNoSleep.value = 'null';
+        optNoSleep.textContent = 'なし（睡眠なし・24時間稼働）';
+        selSleep.appendChild(optNoSleep);
+        for (let h = 0; h <= 29; h++) {
+            const opt = document.createElement('option');
+            opt.value = String(h);
+            opt.textContent = formatHourOption(h);
+            selSleep.appendChild(opt);
+        }
+
+        // メイン休憩・軽食時間（なし ＋ 00:00〜23:00）
+        const breakSel = document.getElementById('selMealBreak');
+        if (breakSel) {
+            breakSel.innerHTML = '';
+            const noneOpt = document.createElement('option');
+            noneOpt.value = 'null';
+            noneOpt.textContent = 'なし（休憩・昼食をとらない）';
+            breakSel.appendChild(noneOpt);
+            for (let h = 0; h <= 23; h++) {
+                const opt = document.createElement('option');
+                opt.value = String(h);
+                const tag = (h >= 11 && h <= 14) ? '（昼食・休憩）' : '（休憩・軽食）';
+                opt.textContent = `${String(h).padStart(2, '0')}:00 ${tag}`;
+                breakSel.appendChild(opt);
+            }
+        }
+    }
+
+    function renderAll() {
+        const charObj = getActiveChar();
+        const { profile, state, habits } = charObj;
+
+        const hh = String(state.hour).padStart(2, '0');
+        const period = getTimePeriodByHour(state.hour);
+        const periodIconMap = { morning: '🌅', day: '☀️', evening: '🌇', night: '🌙' };
+        const periodIcon = periodIconMap[period] || '🕒';
+        document.getElementById('uiDateDisplay').textContent = `📅 ${state.year}年目 ${state.season} ${state.month}月${state.day}日 (${state.dayOfWeek})`;
+        document.getElementById('uiTimeDisplay').textContent = `${periodIcon} ${hh}:00`;
+
+        const roomArea = document.getElementById('uiRoomArea');
+        const roomBgLayer = document.getElementById('uiRoomBgLayer');
+        const timeOverlay = document.getElementById('uiRoomTimeOverlay');
+        const placeholder = document.getElementById('uiRoomPlaceholder');
+
+        const bgState = resolveRoomBackgroundState(profile, state.hour);
+        
+        roomArea.classList.remove('is-night');
+        if (period === 'night' && (bgState.filterClass === 'filter-night' || bgState.defaultBgClass === 'default-bg-night')) {
+            roomArea.classList.add('is-night');
+        }
+
+        roomBgLayer.classList.remove(
+            'filter-morning', 'filter-day', 'filter-evening', 'filter-night',
+            'default-bg-morning', 'default-bg-day', 'default-bg-evening', 'default-bg-night'
+        );
+        timeOverlay.classList.remove('tint-none', 'tint-morning', 'tint-evening', 'tint-night');
+
+        if (bgState.hasImage) {
+            roomBgLayer.style.backgroundImage = `url("${bgState.imageUrl}")`;
+            roomBgLayer.classList.add(bgState.filterClass);
+            timeOverlay.classList.add(bgState.tintClass);
+            placeholder.style.display = 'none';
+        } else {
+            roomBgLayer.style.backgroundImage = '';
+            if (bgState.defaultBgClass) {
+                roomBgLayer.classList.add(bgState.defaultBgClass);
+            }
+            timeOverlay.classList.add('tint-none');
+            placeholder.style.display = '';
+        }
+
+        const thoughtBtn = document.getElementById('uiThoughtBtn');
+        if (state.pendingThought) {
+            thoughtBtn.classList.add('active');
+        } else {
+            thoughtBtn.classList.remove('active');
+            clearThoughtChoicesUI();
+        }
+
+        document.getElementById('uiDialogueName').textContent = profile.name;
+        const lines = String(state.currentSpeech || '').split('\n');
+        document.getElementById('uiDialogueText').innerHTML = lines.map(l => `<p>${escapeHtml(l)}</p>`).join('');
+
+        const talkBtn = document.getElementById('btnInlineTalk');
+        const alreadyTalkedThisHour = (state.lastTalkedTimeKey === getTimeKey(state));
+        talkBtn.disabled = alreadyTalkedThisHour;
+        talkBtn.textContent = alreadyTalkedThisHour ? '💬 声かけ済 (1時間に1回)' : '💬 話しかける';
+
+        document.getElementById('uiStatusName').textContent = profile.name;
+        const subParts = [profile.job, profile.workplace, profile.affiliation ? `（${profile.affiliation}）` : ''].filter(Boolean);
+        document.getElementById('uiStatusSub').textContent = subParts.length > 0 ? subParts.join(' ') : profile.lifeStyle;
+
+        // スケジュール一覧の表示（終日睡眠・不眠24時間稼働・夜行性・過眠すべてに対応）
+        const sch = profile.schedule || { wake: 7, start: 8, end: 18, sleep: 23 };
+        const meal = profile.mealSettings || { breakfast: true, breakHour: 12, dinner: true };
+        const model = LIFESTYLE_MODELS[profile.lifeStyle] || LIFESTYLE_MODELS['独自'];
+        const isHoliday = isCharacterHoliday(profile, state.dayOfWeek);
+        const noWorkStyles = ['無職', '冬眠・終日睡眠'];
+        const hasScheduledWork = (!noWorkStyles.includes(profile.lifeStyle) && sch.wake !== null && sch.start !== null && sch.end !== null && !isHoliday);
+        const dinnerHour = resolveDailyDinnerHour(sch, meal, hasScheduledWork);
+        const fmt = h => h === null ? '--:--' : `${String(h).padStart(2, '0')}:00`;
+
+        const schItems = [];
+
+        if (sch.wake === null) {
+            schItems.push(`<li><span>終日</span> 就寝中（終日睡眠）</li>`);
+        } else {
+            const isSleepless = (sch.sleep === null);
+            const wakeRef = sch.wake;
+            const schEvents = [];
+
+            if (!isSleepless) {
+                schEvents.push({ hour: sch.wake, label: meal.breakfast ? '起床・朝食' : '起床', order: 0 });
+            } else if (meal.breakfast) {
+                schEvents.push({ hour: sch.wake, label: '朝食', order: 0 });
+            }
+
+            if (!hasScheduledWork) {
+                const freeLabel = isSleepless
+                    ? '自由時間（睡眠なし）'
+                    : ((isHoliday && !noWorkStyles.includes(profile.lifeStyle) && sch.start !== null) ? '自由時間（休日）' : '自由時間');
+                schEvents.push({ hour: null, label: freeLabel, order: 0.5 });
+            } else {
+                schEvents.push({ hour: sch.start, label: model.startLabel, order: hoursSince(sch.start, wakeRef) || 0.2 });
+                const endMod = sch.end % 24;
+                const endLabel = (dinnerHour !== null && dinnerHour === endMod) ? `${model.endLabel}・夕食` : model.endLabel;
+                schEvents.push({ hour: sch.end, label: endLabel, order: hoursSince(endMod, wakeRef) || 23.5 });
+            }
+
+            if (meal.breakHour !== null && meal.breakHour !== undefined && !isHourSleeping(meal.breakHour, sch.wake, sch.sleep)) {
+                if (isSleepless || meal.breakHour !== sch.wake) {
+                    const brkLabel = (meal.breakHour >= 11 && meal.breakHour <= 14) ? '昼食・休憩' : '休憩・軽食';
+                    schEvents.push({ hour: meal.breakHour, label: brkLabel, order: hoursSince(meal.breakHour, wakeRef) });
+                }
+            }
+
+            const endMod = hasScheduledWork && sch.end !== null ? (sch.end % 24) : null;
+            if (dinnerHour !== null && (!hasScheduledWork || dinnerHour !== endMod)) {
+                schEvents.push({ hour: dinnerHour, label: '夕食', order: hoursSince(dinnerHour, wakeRef) });
+            }
+
+            schEvents.sort((a, b) => a.order - b.order);
+
+            schEvents.forEach(ev => {
+                const timeLabel = ev.hour === null ? '終日' : fmt(ev.hour);
+                schItems.push(`<li><span>${timeLabel}</span> ${escapeHtml(ev.label)}</li>`);
+            });
+
+            if (isSleepless) {
+                schItems.push(`<li><span>24h</span> 睡眠なし（常時稼働）</li>`);
+            } else {
+                const awakeDur = hoursSince(sch.sleep, sch.wake);
+                const sleepLabel = awakeDur <= 3 ? `就寝（${24 - awakeDur}h睡眠）` : '就寝';
+                schItems.push(`<li><span>${fmt(sch.sleep)}</span> ${escapeHtml(sleepLabel)}</li>`);
+            }
+        }
+
+        document.getElementById('uiScheduleList').innerHTML = schItems.join('');
+
+        document.getElementById('uiCurrentAction').textContent = state.currentAction;
+
+        const noteObj = buildObservationNoteText(habits, state.dayOfWeek);
+        const noteEl = document.getElementById('uiObservationNote');
+        noteEl.textContent = noteObj.text;
+        if (noteObj.isEmpty) {
+            noteEl.classList.add('empty');
+        } else {
+            noteEl.classList.remove('empty');
+        }
+
+        const faceContainer = document.getElementById('uiFaceIconContainer');
+        faceContainer.textContent = '';
+        if (isSafeImageDataUrl(profile.faceImageData)) {
+            const img = document.createElement('img');
+            img.src = profile.faceImageData;
+            img.alt = profile.name || '住人アイコン';
+            faceContainer.appendChild(img);
+        } else {
+            const span = document.createElement('span');
+            span.id = 'uiFaceDefaultIcon';
+            span.textContent = state.actionType === 'sleep' ? '😴' : '🙂';
+            faceContainer.appendChild(span);
+        }
+
+        const charName = profile.name || '住人';
+        const memTitleEl = document.getElementById('uiMemoriesModalTitle');
+        if (memTitleEl) memTitleEl.textContent = `📖 ${charName}の日々の思い出（1日1ログ）`;
+        const memSubEl = document.getElementById('uiMemoriesSubTitle');
+        if (memSubEl) memSubEl.textContent = `${charName}自身の振り返り（1日につき1件記録されます）`;
+        const diaryTitleEl = document.getElementById('uiDiaryModalTitle');
+        if (diaryTitleEl) diaryTitleEl.textContent = `📝 ${charName}の観察日記`;
+        const diaryWriteEl = document.getElementById('uiDiaryWriteTitle');
+        if (diaryWriteEl) diaryWriteEl.textContent = `${charName}の様子を観察者メモに記帳する`;
+        const diaryHistEl = document.getElementById('uiDiaryHistoryTitle');
+        if (diaryHistEl) diaryHistEl.textContent = `これまでの観察日記（${charName}）`;
+        const diaryInpEl = document.getElementById('inpDiaryEntry');
+        if (diaryInpEl) diaryInpEl.placeholder = `${charName}の今日見かけた様子や気づきを記録（Enterでも記帳）...`;
+    }
+
+    let isGeneratingLLM = false;
+    let currentLlmRequestId = 0;
+    let currentLlmAbortController = null;
+
+    function cancelInFlightLlm() {
+        currentLlmRequestId += 1;
+        if (currentLlmAbortController) {
+            try {
+                currentLlmAbortController.abort();
+            } catch (e) {}
+            currentLlmAbortController = null;
+        }
+        isGeneratingLLM = false;
+    }
+
+    function sanitizeLlmSpeech(rawText) {
+        if (!rawText) return null;
+        let text = String(rawText).trim();
+        text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+        text = text.replace(/<think>[\s\S]*$/gi, '').trim();
+        text = text.replace(/```(?:json|text)?([\s\S]*?)```/gi, '$1').trim();
+        text = text.replace(/^(?:セリフ|独り言|返答|発言|出力)\s*[:：]\s*/i, '').trim();
+        text = text.replace(/（[^）]{1,35}）/g, '').replace(/\([^)]{1,35}\)/g, '').trim();
+        text = text.replace(/\r?\n+/g, '').trim();
+        text = text.replace(/^[「『"“”'‘’]+/, '').replace(/[」』"“”'‘’]+$/, '').trim();
+        if (!text) return null;
+
+        if (text.length > 200) {
+            const cut = text.slice(0, 195);
+            const lastPeriod = Math.max(cut.lastIndexOf('。'), cut.lastIndexOf('！'), cut.lastIndexOf('？'));
+            text = lastPeriod > 25 ? cut.slice(0, lastPeriod + 1) : cut + '。';
+        }
+        if (!/[。！？…♪～」』]$/.test(text)) {
+            text += '。';
+        }
+        return text;
+    }
+
+    async function fetchWithTimeout(url, options, externalController = null, timeoutMs = LLM_TIMEOUT_MS) {
+        const controller = externalController || new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            return await fetch(url, { ...options, signal: controller.signal });
+        } finally {
+            clearTimeout(timer);
+        }
+    }
+
+    async function callGeminiAPI(systemInstruction, userQuery, abortController) {
+        const apiKey = (llmConfig.geminiApiKey || "").trim();
+        const modelName = (llmConfig.geminiModel || "gemini-3-flash-preview").trim() || "gemini-3-flash-preview";
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelName)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+        const payload = {
+            contents: [{ parts: [{ text: userQuery }] }],
+            systemInstruction: { parts: [{ text: systemInstruction }] },
+            generationConfig: {
+                temperature: 0.75,
+                maxOutputTokens: 1024,
+                thinkingConfig: {
+                    thinkingBudget: 0
+                }
+            }
+        };
+
+        const isAuthOrKeyError = (status, errBody) => {
+            if (status === 401 || status === 403) return true;
+            const msg = String(errBody?.error?.message || errBody?.error?.status || '').toLowerCase();
+            if (/api[\s_]*key|key not valid|unauthenticated|permission|credential|invalid argument.*key/.test(msg)) {
+                return true;
+            }
+            return false;
+        };
+
+        try {
+            let response = await fetchWithTimeout(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }, abortController);
+
+            if (!response.ok) {
+                const firstErrBody = await response.clone().json().catch(() => null);
+
+                if (isAuthOrKeyError(response.status, firstErrBody)) {
+                    if (!hasNotifiedGeminiAuthIssue) {
+                        hasNotifiedGeminiAuthIssue = true;
+                        showToast('Gemini APIキーが未設定または無効なため、例文ベースのセリフで表示します（💾データ管理から設定可能）');
+                    }
+                    return null;
+                }
+
+                if (response.status === 400) {
+                    delete payload.generationConfig.thinkingConfig;
+                    response = await fetchWithTimeout(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    }, abortController);
+                }
+
+                if (!response.ok) {
+                    const secondErrBody = await response.clone().json().catch(() => null);
+                    if (isAuthOrKeyError(response.status, secondErrBody) || (!apiKey && response.status === 400)) {
+                        if (!hasNotifiedGeminiAuthIssue) {
+                            hasNotifiedGeminiAuthIssue = true;
+                            showToast('Gemini APIキーが未設定または無効なため、例文ベースのセリフで表示します（💾データ管理から設定可能）');
+                        }
+                    } else {
+                        console.warn("Gemini API status:", response.status);
+                    }
+                    return null;
+                }
+            }
+
+            const result = await response.json();
+            const candidate = result.candidates?.[0];
+            const parts = candidate?.content?.parts;
+            if (Array.isArray(parts) && parts.length > 0) {
+                const mainText = parts
+                    .filter(p => !p.thought && typeof p.text === 'string')
+                    .map(p => p.text)
+                    .join('')
+                    .trim();
+                const fallbackText = parts.map(p => p.text || '').join('').trim();
+                return sanitizeLlmSpeech(mainText || fallbackText);
+            }
+            return null;
+        } catch (e) {
+            if (e && e.name === 'AbortError') return null;
+            console.error("Gemini通信エラーまたはタイムアウト:", e);
+            return null;
+        }
+    }
+
+    async function callLocalOpenAIAPI(systemInstruction, userQuery, abortController) {
+        let endpoint = (llmConfig.localEndpoint || 'http://localhost:1234/v1/chat/completions').trim();
+        if (endpoint.endsWith('/v1') || endpoint.endsWith('/v1/')) {
+            endpoint = endpoint.replace(/\/$/, '') + '/chat/completions';
+        }
+        const model = (llmConfig.localModel || 'local-model').trim();
+
+        const payload = {
+            model: model,
+            messages: [
+                { role: 'system', content: systemInstruction },
+                { role: 'user', content: userQuery }
+            ],
+            temperature: 0.72,
+            max_tokens: 512
+        };
+
+        try {
+            const response = await fetchWithTimeout(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }, abortController);
+            if (!response.ok) {
+                console.warn("Local LLM HTTP status:", response.status);
+                return null;
+            }
+            const result = await response.json();
+            const content = result.choices?.[0]?.message?.content;
+            if (content) {
+                return sanitizeLlmSpeech(content);
+            }
+            return null;
+        } catch (e) {
+            if (e && e.name === 'AbortError') return null;
+            console.error("ローカルLLM通信エラーまたはタイムアウト:", e);
+            return null;
+        }
+    }
+
+    async function requestLlmGeneration(systemInstruction, userQuery, abortController) {
+        if (llmConfig.provider === 'offline') {
+            return null;
+        }
+        if (llmConfig.provider === 'local_openai') {
+            return await callLocalOpenAIAPI(systemInstruction, userQuery, abortController);
+        }
+        return await callGeminiAPI(systemInstruction, userQuery, abortController);
+    }
+
+    async function updateSpeechWithLLM(charObj, type = 'monologue', userMessage = '', options = {}) {
+        const isTest = Boolean(options.isTest);
+        if (llmConfig.provider === 'offline') return { ok: false, reason: 'offline' };
+
+        const { profile, state, memories } = charObj;
+        if (!isTest && state.actionType === 'sleep') {
+            return { ok: false, reason: 'sleeping' };
+        }
+
+        cancelInFlightLlm();
+
+        const reqId = ++currentLlmRequestId;
+        const abortController = new AbortController();
+        currentLlmAbortController = abortController;
+        isGeneratingLLM = true;
+
+        const targetCharId = profile.id;
+        const startTimeKey = getTimeKey(state);
+        const startAction = state.currentAction;
+        const simulatedAction = (isTest && state.actionType === 'sleep')
+            ? `${(profile.hobbies && profile.hobbies[0]) || '読書'}をして過ごしている`
+            : state.currentAction;
+
+        const dialogueEl = document.getElementById('uiDialogueText');
+        const originalSpeech = state.currentSpeech;
+
+        try {
+            if (getActiveChar().profile.id === targetCharId) {
+                dialogueEl.innerHTML = '<p class="loading-text">（言葉を紡いでいる……）</p>';
+            }
+
+            const sampleList = (profile.speechSamples || []).filter(Boolean);
+            const samplesBlock = sampleList.length > 0
+                ? `\n【発話の例文（以下の例文の一人称・語尾・句読点・リズムを徹底的に模倣すること）】\n` + sampleList.map(s => `- 「${s.replace(/^[「『"“”']+|[」』"“”']+$/g, '')}」`).join('\n')
+                : '';
+
+            const sysPrompt = `あなたは箱庭の中で暮らしている以下のキャラクター本人です。設定された性格・思考傾向・口調・例文の話し方を完璧に保って、自然な日本語のみで発言してください。
+
+【キャラクタープロフィール】
+- 名前: ${profile.name || '名無しの住人'}
+- 職業・立場: ${[profile.job, profile.workplace, profile.affiliation].filter(Boolean).join(' / ') || profile.lifeStyle}
+- 性格・人物像: ${profile.summary || '穏やかに日々を暮らしている。'}
+- 好きなもの: ${(profile.likes && profile.likes.length > 0) ? profile.likes.join('、') : '特になし'}
+- 苦手なもの: ${(profile.dislikes && profile.dislikes.length > 0) ? profile.dislikes.join('、') : '特になし'}
+
+【最重要：口調・一人称・文末語尾の指定】
+${profile.tone || '一人称は「私」。自然で落ち着いた口調で話す。'}${samplesBlock}
+
+【絶対に守るべき出力ルール】
+1. 文末の徹底（体言止め・尻切れの禁止）：
+   - 「穏やかな朝に読書を楽しむ」「ええ、良い朝」のような体言止めや、文末の敬語・語尾を省略した表現は絶対に禁止です。
+   - 独り言であっても、必ず上記の【口調・一人称・文末語尾の指定】および【発話の例文】の語尾を使って、文の最後まで完全に言い切ってください。
+2. 性格・内面の反映：
+   - 単なる状況報告だけにせず、【性格・人物像】ならではの視点や思考・感情が自然に滲み出る1〜2文（40〜90文字程度）にしてください。
+3. 形式：
+   - ト書き（（微笑む）などの括弧書き）や名前表記、外側の鉤括弧「」は付けず、キャラクターが口にしたセリフの文章のみを出力してください。
+4. 言語制限（最重要・日本語以外の言語の混入禁止）：
+   - 出力には必ず「自然な日本語」のみを使用してください。
+   - 英語（英単語・アルファベット文）、中国語（簡体字・繁体字特有の文字や中国語文法）、韓国語（ハングル）、ロシア語など、日本語以外の言語や文字の混入は固く禁じます。`;
+
+            const recentMemories = (memories || []).slice(0, 2).map(m => m.text).join(' / ');
+
+            let userPrompt = `【現在の状況】
+- 日時・季節: ${state.year}年目 ${state.season}（${state.month}月${state.day}日・${state.dayOfWeek}曜日） ${state.hour}:00
+- 現在の行動: ${simulatedAction}
+- 最近の出来事: ${recentMemories || '普段通りの日常'}\n\n`;
+
+            if (type === 'talk') {
+                if (state.actionType === 'work' || state.actionType === 'morning') {
+                    userPrompt += `観察者（プレイヤー）から「${userMessage || '今大丈夫？'}」と声をかけられましたが、現在は「${simulatedAction}」の最中で手が離せません。あなたの性格と指定された口調・例文の話し方を厳守し、体言止めを使わずに自然な日本語のみで1〜2文で返答してください。（※英語や中国語など日本語以外の言語・文字は絶対に混ぜないでください）`;
+                } else {
+                    userPrompt += `観察者（プレイヤー）から「${userMessage || '調子はどう？'}」と声をかけられました。現在の季節（${state.season}）や行動（${simulatedAction}）、あなたの性格を踏まえ、指定された口調・例文の話し方で文末までしっかり言い切る形で、自然な日本語のみで1〜2文で返答してください。（※英語や中国語など日本語以外の言語・文字は絶対に混ぜないでください）`;
+                }
+            } else {
+                userPrompt += `現在、季節は「${state.season}」で、あなたは「${simulatedAction}」をしています。あなたの性格が滲み出るような思考や感想を、指定された一人称・口調・例文の話し方を厳守して自然な日本語のみで1〜2文で話してください。独り言であっても決して体言止めや常体に崩さず、指定の語尾で文末まで完全に言い切ってください。（※英語や中国語など日本語以外の言語・文字は絶対に混ぜないでください）`;
+            }
+
+            const generatedText = await requestLlmGeneration(sysPrompt, userPrompt, abortController);
+
+            if (reqId !== currentLlmRequestId) {
+                return { ok: false, reason: 'stale' };
+            }
+            if (!isTest && (getTimeKey(state) !== startTimeKey || state.currentAction !== startAction)) {
+                return { ok: false, reason: 'stale' };
+            }
+
+            if (generatedText && generatedText.length > 0) {
+                if (!isTest || state.actionType !== 'sleep') {
+                    state.currentSpeech = `「${generatedText}」`;
+                }
+                if (getActiveChar().profile.id === targetCharId) {
+                    renderAll();
+                }
+                return { ok: true, text: `「${generatedText}」` };
+            } else {
+                state.currentSpeech = originalSpeech;
+                if (getActiveChar().profile.id === targetCharId) {
+                    renderAll();
+                }
+                return { ok: false, reason: 'api_error' };
+            }
+        } catch (err) {
+            if (reqId === currentLlmRequestId) {
+                state.currentSpeech = originalSpeech;
+                if (getActiveChar().profile.id === targetCharId) {
+                    renderAll();
+                }
+            }
+            return { ok: false, reason: 'exception' };
+        } finally {
+            if (reqId === currentLlmRequestId) {
+                isGeneratingLLM = false;
+                currentLlmAbortController = null;
+            }
+        }
+    }
+
+    async function advanceTimeByHours(hours) {
+        cancelInFlightLlm();
+        clearThoughtChoicesUI();
+
+        const charObj = getActiveChar();
+        for (let i = 0; i < hours; i++) {
+            advanceOneHourStep(charObj);
+        }
+
+        saveStorage();
+        renderAll();
+
+        if (charObj.state.needsLLMUpdate) {
+            charObj.state.needsLLMUpdate = false;
+            saveStorage();
+
+            const res = await updateSpeechWithLLM(charObj, 'monologue');
+            if (res.ok) {
+                saveStorage();
+                renderAll();
+            }
+        }
+    }
+
+    document.getElementById('btnAdvance1h').addEventListener('click', () => advanceTimeByHours(1));
+    document.getElementById('btnAdvance6h').addEventListener('click', () => advanceTimeByHours(6));
+    document.getElementById('btnAdvance1d').addEventListener('click', () => advanceTimeByHours(24));
+    document.getElementById('btnAdvance1w').addEventListener('click', () => advanceTimeByHours(168));
+
+    document.getElementById('uiThoughtBtn').addEventListener('click', () => {
+        const charObj = getActiveChar();
+        const boundCharId = charObj.profile.id;
+        const thought = charObj.state.pendingThought;
+        if (!thought) return;
+
+        charObj.state.currentSpeech = thought.prompt;
+        const choicesBox = document.getElementById('uiDialogueChoices');
+        choicesBox.innerHTML = '';
+
+        thought.options.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'choice-btn';
+            btn.textContent = opt.label;
+            btn.addEventListener('click', async () => {
+                if (getActiveChar().profile.id !== boundCharId) {
+                    clearThoughtChoicesUI();
+                    return;
+                }
+                charObj.state.currentHobby = opt.hobby;
+                charObj.state.hobbyBlockHours = 1;
+                charObj.state.hobbyTargetHours = 3;
+                charObj.state.currentAction = `${opt.hobby}をして過ごしている`;
+                charObj.state.currentSpeech = opt.reply;
+                charObj.state.pendingThought = null;
+                upsertDailyMemory(
+                    charObj,
+                    `何をして過ごすか迷っていたとき、ちょっとした助言をもらって${opt.hobby}をして過ごした。`,
+                    true
+                );
+                clearThoughtChoicesUI();
+                saveStorage();
+                renderAll();
+
+                const res = await updateSpeechWithLLM(charObj, 'talk', opt.label);
+                if (res.ok) {
+                    saveStorage();
+                    renderAll();
+                }
+            });
+            choicesBox.appendChild(btn);
+        });
+
+        renderAll();
+        choicesBox.classList.add('active');
+    });
+
+    async function executeTalkInteraction(inputMessage) {
+        const charObj = getActiveChar();
+        const { profile, state } = charObj;
+        const name = profile.name || '住人';
+
+        const currentTimeKey = getTimeKey(state);
+        if (state.lastTalkedTimeKey === currentTimeKey) {
+            showToast('声をかけられるのは1時間に1回までです');
+            return;
+        }
+        state.lastTalkedTimeKey = currentTimeKey;
+
+        const trimmed = (inputMessage || '').trim();
+        const likes = (profile.likes && profile.likes.length > 0) ? profile.likes : ['お茶'];
+        const fav = likes[Math.floor(Math.random() * likes.length)];
+
+        if (trimmed === '邪魔しないように見守る') {
+            state.currentSpeech = `（視線に気づいて少しこちらを見たあと、${name}は穏やかに微笑んで元の作業に戻った）`;
+            upsertDailyMemory(
+                charObj,
+                `${state.currentAction}の間、誰かに静かに見守られていた気がする。穏やかな一日だった。`,
+                true
+            );
+            saveStorage();
+            renderAll();
+        } else if (state.actionType === 'sleep') {
+            state.currentSpeech = `（${name}は深く眠っているようだ。そっとしておこう）`;
+            upsertDailyMemory(
+                charObj,
+                `静かに深く眠りについた。誰かが様子を見に来てくれた気配がした。`,
+                true
+            );
+            saveStorage();
+            renderAll();
+        } else if (state.actionType === 'work' || state.actionType === 'morning') {
+            const busySample = pickContextualSample(profile, state, 'talk_busy');
+            if (busySample) {
+                state.currentSpeech = `「${busySample}」\n（${name}は現在「${state.currentAction}」で手が離せないようだ）`;
+            } else {
+                state.currentSpeech = `（${name}は現在「${state.currentAction}」で手が離せないようだ。落ち着いたらまた後で声をかけよう）`;
+            }
+            upsertDailyMemory(
+                charObj,
+                `${state.currentAction}に声をかけられたが、手が離せず後にしてもらった。`,
+                true
+            );
+            saveStorage();
+            renderAll();
+
+            const res = await updateSpeechWithLLM(charObj, 'talk', trimmed || '今ちょっといい？');
+            if (res.ok) {
+                saveStorage();
+                renderAll();
+            }
+        } else {
+            const actLabel = state.actionType === 'meal' ? '食事・休憩' : (state.currentHobby || '休息');
+            const freeSample = pickContextualSample(profile, state, 'talk_free');
+            if (freeSample) {
+                state.currentSpeech = `「${freeSample}」\n（${actLabel}の手を少し休めて、こちらの声かけに穏やかに応じている）`;
+            } else {
+                state.currentSpeech = `（${name}は${actLabel}の手を少し止め、${fav}を片手に穏やかに応じてくれた）`;
+            }
+            upsertDailyMemory(
+                charObj,
+                `${actLabel}の合間に、${fav}や日常のことを少し言葉にして交わした。`,
+                true
+            );
+
+            saveStorage();
+            renderAll();
+
+            const res = await updateSpeechWithLLM(charObj, 'talk', trimmed || '調子はどう？');
+            if (res.ok) {
+                saveStorage();
+                renderAll();
+            }
+        }
+    }
+
+    function openTalkModal() {
+        const charObj = getActiveChar();
+        if (charObj.state.lastTalkedTimeKey === getTimeKey(charObj.state)) {
+            showToast('声をかけられるのは1時間に1回までです');
+            return;
+        }
+        const inp = document.getElementById('inpTalkMessage');
+        inp.value = '';
+        document.getElementById('modalTalk').classList.add('active');
+        setTimeout(() => inp.focus(), 50);
+    }
+
+    document.getElementById('btnInlineTalk').addEventListener('click', openTalkModal);
+
+    document.querySelectorAll('[data-quick-talk]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const msg = btn.getAttribute('data-quick-talk');
+            document.getElementById('modalTalk').classList.remove('active');
+            executeTalkInteraction(msg);
+        });
+    });
+
+    function submitTalkFromInput() {
+        const msg = document.getElementById('inpTalkMessage').value;
+        document.getElementById('modalTalk').classList.remove('active');
+        executeTalkInteraction(msg);
+    }
+
+    document.getElementById('btnSendTalk').addEventListener('click', submitTalkFromInput);
+
+    document.getElementById('inpTalkMessage').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) {
+            e.preventDefault();
+            submitTalkFromInput();
+        }
+    });
+
+    let tempFaceData = '';
+    let tempRoomData = '';
+    let tempRoomMorning = '';
+    let tempRoomEvening = '';
+    let tempRoomNight = '';
+
+    function updateSettingsImageStatusLabels() {
+        document.getElementById('uiFaceImgStatus').textContent = tempFaceData ? '（登録済）' : '（未登録）';
+        document.getElementById('uiRoomDayStatus').textContent = tempRoomData ? '（登録済）' : '（未登録）';
+        document.getElementById('uiRoomMorningStatus').textContent = tempRoomMorning ? '（登録済）' : '（自動補完）';
+        document.getElementById('uiRoomEveningStatus').textContent = tempRoomEvening ? '（登録済）' : '（自動補完）';
+        document.getElementById('uiRoomNightStatus').textContent = tempRoomNight ? '（登録済）' : '（自動補完）';
+    }
+
+    function updateMealSummaryUIFromInputs() {
+        const bfast = document.getElementById('chkMealBreakfast').checked;
+        const din = document.getElementById('chkMealDinner').checked;
+        const brkVal = document.getElementById('selMealBreak').value;
+        const breakHour = (brkVal === 'null') ? null : parseInt(brkVal, 10);
+        const currentMealObj = { breakfast: bfast, breakHour, dinner: din };
+
+        const labelEl = document.getElementById('uiMealSummaryLabel');
+        if (labelEl) {
+            labelEl.textContent = formatMealSummaryText(currentMealObj);
+        }
+
+        const matchedKey = detectMatchingMealPresetKey(currentMealObj);
+        document.querySelectorAll('[data-meal-preset]').forEach(btn => {
+            if (btn.getAttribute('data-meal-preset') === matchedKey) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+    }
+
+    function updateScheduleHintFromSelects() {
+        const wakeRaw = document.getElementById('selWake').value;
+        const sleepRaw = document.getElementById('selSleep').value;
+        const hintEl = document.getElementById('uiScheduleSleepHint');
+        if (!hintEl) return;
+
+        if (wakeRaw === 'null') {
+            hintEl.textContent = '💤 現在の設定：1日中眠っている（終日睡眠・24時間就寝）モードです。';
+            return;
+        }
+        if (sleepRaw === 'null') {
+            hintEl.textContent = '⚡ 現在の設定：睡眠をとらない（1日中起きている・24時間常時稼働）モードです。';
+            return;
+        }
+        const w = parseInt(wakeRaw, 10);
+        const s = parseInt(sleepRaw, 10);
+        if (Number.isFinite(w) && Number.isFinite(s)) {
+            const awakeDur = hoursSince(s, w);
+            if (awakeDur === 0) {
+                hintEl.textContent = '⚠️ 起床時間と就寝時間が同じ時刻になっています（終日睡眠や睡眠なしにする場合は選択肢の「なし」を選んでください）。';
+            } else {
+                const sleepDur = 24 - awakeDur;
+                hintEl.textContent = `🕒 現在の設定：1日の活動時間は ${awakeDur}時間 / 睡眠時間は ${sleepDur}時間 です。`;
+            }
+        }
+    }
+
+    function openSettingsModal() {
+        const { profile } = getActiveChar();
+        document.getElementById('inpName').value = profile.name || '';
+        document.getElementById('inpJob').value = profile.job || '';
+        document.getElementById('inpWorkplace').value = profile.workplace || '';
+        document.getElementById('inpAffiliation').value = profile.affiliation || '';
+        document.getElementById('inpHobbies').value = (profile.hobbies || []).join(', ');
+        document.getElementById('selLifestyle').value = profile.lifeStyle || '社会人';
+
+        const wakeVal = profile.schedule.wake;
+        const sleepVal = profile.schedule.sleep;
+        document.getElementById('selWake').value = (wakeVal === null || wakeVal === undefined) ? 'null' : String(Math.min(23, Math.max(0, wakeVal)));
+        document.getElementById('selStart').value = (profile.schedule.start === null || profile.schedule.start === undefined) ? 'null' : String(Math.min(23, Math.max(0, profile.schedule.start)));
+        document.getElementById('selEnd').value = (profile.schedule.end === null || profile.schedule.end === undefined) ? 'null' : String(Math.min(29, Math.max(0, profile.schedule.end)));
+        document.getElementById('selSleep').value = (sleepVal === null || sleepVal === undefined) ? 'null' : String(Math.min(29, Math.max(0, sleepVal)));
+        updateScheduleHintFromSelects();
+
+        const holidays = Array.isArray(profile.holidays) ? profile.holidays : ['日', '土'];
+        document.querySelectorAll('input[name="chkHoliday"]').forEach(chk => {
+            chk.checked = holidays.includes(chk.value);
+        });
+
+        const meal = profile.mealSettings || { breakfast: true, breakHour: 12, dinner: true };
+        document.getElementById('chkMealBreakfast').checked = Boolean(meal.breakfast);
+        document.getElementById('chkMealDinner').checked = Boolean(meal.dinner);
+        document.getElementById('selMealBreak').value = (meal.breakHour === null || meal.breakHour === undefined) ? 'null' : String(meal.breakHour);
+        updateMealSummaryUIFromInputs();
+
+        const mealAdvBox = document.getElementById('uiMealAdvancedBox');
+        const mealToggleBtn = document.getElementById('btnToggleMealBox');
+        const isNonDefaultMeal = (!meal.breakfast || !meal.dinner || meal.breakHour !== 12);
+        if (isNonDefaultMeal) {
+            mealAdvBox.classList.add('active');
+            mealToggleBtn.textContent = '🍽️ 食事・休憩のこだわり設定を閉じる ▲';
+        } else {
+            mealAdvBox.classList.remove('active');
+            mealToggleBtn.textContent = '🍽️ 食事・休憩のこだわり設定を開く ▼';
+        }
+
+        document.getElementById('inpSummary').value = profile.summary || '';
+        document.getElementById('selSpeechPreset').value = '';
+        document.getElementById('inpTone').value = profile.tone || '';
+        document.getElementById('inpSpeechSamples').value = (profile.speechSamples || []).join('\n');
+        document.getElementById('inpLikes').value = (profile.likes || []).join(', ');
+        document.getElementById('inpDislikes').value = (profile.dislikes || []).join(', ');
+
+        tempFaceData = profile.faceImageData || '';
+        tempRoomData = profile.roomImageData || '';
+        tempRoomMorning = (profile.roomImages && profile.roomImages.morning) ? profile.roomImages.morning : '';
+        tempRoomEvening = (profile.roomImages && profile.roomImages.evening) ? profile.roomImages.evening : '';
+        tempRoomNight = (profile.roomImages && profile.roomImages.night) ? profile.roomImages.night : '';
+
+        document.getElementById('chkDayNightEffect').checked = (profile.enableDayNightEffect !== false);
+        document.getElementById('inpFaceImage').value = '';
+        document.getElementById('inpRoomImage').value = '';
+        document.getElementById('inpRoomMorning').value = '';
+        document.getElementById('inpRoomEvening').value = '';
+        document.getElementById('inpRoomNight').value = '';
+
+        const advBox = document.getElementById('uiTimeBgAdvancedBox');
+        const toggleBtn = document.getElementById('btnToggleTimeBgBox');
+        if (tempRoomMorning || tempRoomEvening || tempRoomNight) {
+            advBox.classList.add('active');
+            toggleBtn.textContent = '🌅 朝・夕・夜の個別設定を閉じる ▲';
+        } else {
+            advBox.classList.remove('active');
+            toggleBtn.textContent = '🌅 朝・夕・夜の個別画像を設定する ▼';
+        }
+
+        updateSettingsImageStatusLabels();
+        document.getElementById('modalSettings').classList.add('active');
+    }
+
+    document.getElementById('btnOpenSettings').addEventListener('click', openSettingsModal);
+
+    document.getElementById('selWake').addEventListener('change', updateScheduleHintFromSelects);
+    document.getElementById('selSleep').addEventListener('change', updateScheduleHintFromSelects);
+
+    document.getElementById('btnToggleMealBox').addEventListener('click', () => {
+        const mealAdvBox = document.getElementById('uiMealAdvancedBox');
+        const mealToggleBtn = document.getElementById('btnToggleMealBox');
+        const isOpen = mealAdvBox.classList.toggle('active');
+        mealToggleBtn.textContent = isOpen
+            ? '🍽️ 食事・休憩のこだわり設定を閉じる ▲'
+            : '🍽️ 食事・休憩のこだわり設定を開く ▼';
+    });
+
+    document.querySelectorAll('[data-meal-preset]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const key = btn.getAttribute('data-meal-preset');
+            const preset = MEAL_PRESETS[key];
+            if (!preset) return;
+            document.getElementById('chkMealBreakfast').checked = preset.breakfast;
+            document.getElementById('chkMealDinner').checked = preset.dinner;
+            document.getElementById('selMealBreak').value = preset.breakHour === null ? 'null' : String(preset.breakHour);
+            updateMealSummaryUIFromInputs();
+            showToast(`食生活プリセット「${preset.label}」を反映しました`);
+        });
+    });
+
+    document.getElementById('chkMealBreakfast').addEventListener('change', updateMealSummaryUIFromInputs);
+    document.getElementById('chkMealDinner').addEventListener('change', updateMealSummaryUIFromInputs);
+    document.getElementById('selMealBreak').addEventListener('change', updateMealSummaryUIFromInputs);
+
+    document.getElementById('btnHolidayWeekend').addEventListener('click', () => {
+        document.querySelectorAll('input[name="chkHoliday"]').forEach(chk => {
+            chk.checked = (chk.value === '日' || chk.value === '土');
+        });
+        showToast('休日を「土曜・日曜」に設定しました');
+    });
+
+    document.getElementById('btnHolidayNone').addEventListener('click', () => {
+        document.querySelectorAll('input[name="chkHoliday"]').forEach(chk => {
+            chk.checked = false;
+        });
+        showToast('休日なし（毎日出勤・ワーホリ設定）にしました');
+    });
+
+    document.getElementById('btnHolidayEveryday').addEventListener('click', () => {
+        document.querySelectorAll('input[name="chkHoliday"]').forEach(chk => {
+            chk.checked = true;
+        });
+        showToast('毎日を休日に設定しました');
+    });
+
+    document.getElementById('btnToggleTimeBgBox').addEventListener('click', () => {
+        const advBox = document.getElementById('uiTimeBgAdvancedBox');
+        const toggleBtn = document.getElementById('btnToggleTimeBgBox');
+        const isOpen = advBox.classList.toggle('active');
+        toggleBtn.textContent = isOpen
+            ? '🌅 朝・夕・夜の個別設定を閉じる ▲'
+            : '🌅 朝・夕・夜の個別画像を設定する ▼';
+    });
+
+    document.getElementById('selSpeechPreset').addEventListener('change', (e) => {
+        const key = e.target.value;
+        const preset = SPEECH_PRESETS[key];
+        if (!preset) return;
+
+        document.getElementById('inpTone').value = preset.tone;
+        document.getElementById('inpSpeechSamples').value = preset.samples.join('\n');
+        showToast('プリセットを反映しました。気に入らないセリフは削除・変更しましょう');
+    });
+
+    document.getElementById('selLifestyle').addEventListener('change', (e) => {
+        const styleKey = e.target.value;
+        const tpl = LIFESTYLE_MODELS[styleKey];
+        if (!tpl) return;
+        document.getElementById('selWake').value = tpl.wake === null ? 'null' : String(tpl.wake);
+        document.getElementById('selStart').value = tpl.start === null ? 'null' : String(tpl.start);
+        document.getElementById('selEnd').value = tpl.end === null ? 'null' : String(tpl.end);
+        document.getElementById('selSleep').value = tpl.sleep === null ? 'null' : String(tpl.sleep);
+
+        if (styleKey === '夜行性') {
+            document.getElementById('selMealBreak').value = '0';
+            updateMealSummaryUIFromInputs();
+        } else if (styleKey === '過眠・おねむ' || styleKey === '冬眠・終日睡眠') {
+            document.getElementById('selMealBreak').value = 'null';
+            updateMealSummaryUIFromInputs();
+        }
+        updateScheduleHintFromSelects();
+    });
+
+    function resizeAndCompressImageFile(file, maxDimension, quality, callback) {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onerror = () => showToast('画像の読み込みに失敗しました');
+        reader.onload = (ev) => {
+            const img = new Image();
+            img.onerror = () => showToast('画像データの解析に失敗しました');
+            img.onload = () => {
+                let width = img.width;
+                let height = img.height;
+                if (width > maxDimension || height > maxDimension) {
+                    if (width >= height) {
+                        height = Math.max(1, Math.round((height * maxDimension) / width));
+                        width = maxDimension;
+                    } else {
+                        width = Math.max(1, Math.round((width * maxDimension) / height));
+                        height = maxDimension;
+                    }
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#f9f6f0';
+                ctx.fillRect(0, 0, width, height);
+                ctx.drawImage(img, 0, 0, width, height);
+                const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+                callback(compressedDataUrl);
+            };
+            img.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    document.getElementById('inpFaceImage').addEventListener('change', (e) => {
+        resizeAndCompressImageFile(e.target.files[0], 320, 0.84, (dataUrl) => {
+            tempFaceData = dataUrl;
+            updateSettingsImageStatusLabels();
+            showToast('顔アイコン画像を圧縮して読み込みました');
+        });
+    });
+
+    document.getElementById('inpRoomImage').addEventListener('change', (e) => {
+        resizeAndCompressImageFile(e.target.files[0], 960, 0.78, (dataUrl) => {
+            tempRoomData = dataUrl;
+            updateSettingsImageStatusLabels();
+            showToast('基本の部屋背景（昼）を圧縮して読み込みました');
+        });
+    });
+
+    document.getElementById('inpRoomMorning').addEventListener('change', (e) => {
+        resizeAndCompressImageFile(e.target.files[0], 960, 0.78, (dataUrl) => {
+            tempRoomMorning = dataUrl;
+            updateSettingsImageStatusLabels();
+            showToast('朝の部屋背景を圧縮して読み込みました');
+        });
+    });
+
+    document.getElementById('inpRoomEvening').addEventListener('change', (e) => {
+        resizeAndCompressImageFile(e.target.files[0], 960, 0.78, (dataUrl) => {
+            tempRoomEvening = dataUrl;
+            updateSettingsImageStatusLabels();
+            showToast('夕方の部屋背景を圧縮して読み込みました');
+        });
+    });
+
+    document.getElementById('inpRoomNight').addEventListener('change', (e) => {
+        resizeAndCompressImageFile(e.target.files[0], 960, 0.78, (dataUrl) => {
+            tempRoomNight = dataUrl;
+            updateSettingsImageStatusLabels();
+            showToast('夜の部屋背景を圧縮して読み込みました');
+        });
+    });
+
+    document.getElementById('btnClearFaceImage').addEventListener('click', () => {
+        tempFaceData = '';
+        document.getElementById('inpFaceImage').value = '';
+        updateSettingsImageStatusLabels();
+        showToast('顔アイコン画像をデフォルトに戻しました');
+    });
+
+    document.getElementById('btnClearRoomImage').addEventListener('click', () => {
+        tempRoomData = '';
+        document.getElementById('inpRoomImage').value = '';
+        updateSettingsImageStatusLabels();
+        showToast('基本の部屋背景をクリアしました');
+    });
+
+    document.getElementById('btnClearRoomMorning').addEventListener('click', () => {
+        tempRoomMorning = '';
+        document.getElementById('inpRoomMorning').value = '';
+        updateSettingsImageStatusLabels();
+        showToast('朝の背景をクリアしました（自動補完に戻ります）');
+    });
+
+    document.getElementById('btnClearRoomEvening').addEventListener('click', () => {
+        tempRoomEvening = '';
+        document.getElementById('inpRoomEvening').value = '';
+        updateSettingsImageStatusLabels();
+        showToast('夕方の背景をクリアしました（自動補完に戻ります）');
+    });
+
+    document.getElementById('btnClearRoomNight').addEventListener('click', () => {
+        tempRoomNight = '';
+        document.getElementById('inpRoomNight').value = '';
+        updateSettingsImageStatusLabels();
+        showToast('夜の背景をクリアしました（自動補完に戻ります）');
+    });
+
+    document.getElementById('btnSaveSettings').addEventListener('click', async () => {
+        const lifeStyleVal = document.getElementById('selLifestyle').value;
+        const wakeRaw = document.getElementById('selWake').value;
+        const sleepRaw = document.getElementById('selSleep').value;
+        const startRaw = document.getElementById('selStart').value;
+        const endRaw = document.getElementById('selEnd').value;
+
+        const noWorkStyles = ['無職', '冬眠・終日睡眠'];
+        const wakeVal = (wakeRaw === 'null' || lifeStyleVal === '冬眠・終日睡眠') ? null : parseInt(wakeRaw, 10);
+        const sleepVal = (wakeVal === null) ? 0 : ((sleepRaw === 'null' || lifeStyleVal === '不眠・24時間稼働') ? null : parseInt(sleepRaw, 10));
+        const startVal = (startRaw === 'null' || noWorkStyles.includes(lifeStyleVal) || wakeVal === null) ? null : parseInt(startRaw, 10);
+        const endVal = (endRaw === 'null' || noWorkStyles.includes(lifeStyleVal) || wakeVal === null) ? null : parseInt(endRaw, 10);
+
+        const mealBreakfast = Boolean(document.getElementById('chkMealBreakfast').checked);
+        const mealDinner = Boolean(document.getElementById('chkMealDinner').checked);
+        const breakRaw = document.getElementById('selMealBreak').value;
+        let mealBreakHour = (breakRaw === 'null') ? null : parseInt(breakRaw, 10);
+
+        if (wakeVal !== null && sleepVal !== null && (sleepVal % 24) === (wakeVal % 24)) {
+            showToast('起床時間と就寝時間が同じ時刻になっています。終日睡眠や睡眠なしにする場合は選択肢の「なし」を選んでください');
+            return;
+        }
+
+        if ((startVal === null) !== (endVal === null)) {
+            showToast('出勤・開始時間と帰宅・終了時間は両方設定するか、両方「なし」にしてください');
+            return;
+        }
+
+        if (startVal !== null && endVal !== null) {
+            if ((startVal % 24) === (endVal % 24)) {
+                showToast('出勤・開始時間と帰宅・終了時間が同じ時刻になっています');
+                return;
+            }
+            if (wakeVal !== null && sleepVal !== null) {
+                const awakeDur = hoursSince(sleepVal, wakeVal);
+                const sOff = hoursSince(startVal, wakeVal);
+                const eOff = hoursSince(endVal, wakeVal);
+                if (sOff < 1 || sOff >= awakeDur) {
+                    showToast('出勤・開始時間は起床時間の1時間後〜就寝前の活動時間内に設定してください');
+                    return;
+                }
+                if (eOff <= sOff || eOff >= awakeDur) {
+                    showToast('帰宅・終了時間は出勤・開始より後、かつ就寝時間より前の活動時間内に設定してください');
+                    return;
+                }
+            }
+        }
+
+        let autoClearedBreak = false;
+        if (mealBreakHour !== null) {
+            if (wakeVal === null || (sleepVal !== null && mealBreakHour === wakeVal) || isHourSleeping(mealBreakHour, wakeVal, sleepVal)) {
+                mealBreakHour = null;
+                autoClearedBreak = true;
+            }
+        }
+
+        const charObj = getActiveChar();
+        const { profile, state } = charObj;
+        const backupStr = JSON.stringify(charObj);
+
+        profile.name = document.getElementById('inpName').value.trim() || '名無しの住人';
+        profile.job = document.getElementById('inpJob').value.trim();
+        profile.workplace = document.getElementById('inpWorkplace').value.trim();
+        profile.affiliation = document.getElementById('inpAffiliation').value.trim();
+
+        const parsedHobbies = document.getElementById('inpHobbies').value
+            .split(/[,、，]/)
+            .map(s => s.trim())
+            .filter(Boolean);
+        const hobbyTruncated = parsedHobbies.length > 5;
+        profile.hobbies = parsedHobbies.length > 0 ? parsedHobbies.slice(0, 5) : ['読書'];
+
+        profile.lifeStyle = lifeStyleVal;
+        profile.schedule = {
+            wake: wakeVal,
+            start: startVal,
+            end: endVal,
+            sleep: sleepVal
+        };
+        profile.holidays = Array.from(document.querySelectorAll('input[name="chkHoliday"]:checked'))
+            .map(chk => chk.value)
+            .filter(d => DAYS_JP.includes(d));
+        profile.mealSettings = {
+            breakfast: mealBreakfast,
+            breakHour: mealBreakHour,
+            dinner: mealDinner
+        };
+
+        profile.summary = document.getElementById('inpSummary').value.trim();
+        profile.tone = document.getElementById('inpTone').value.trim();
+        profile.speechSamples = document.getElementById('inpSpeechSamples').value
+            .split('\n')
+            .map(s => s.trim())
+            .filter(Boolean);
+        profile.likes = document.getElementById('inpLikes').value.split(/[,、，]/).map(s => s.trim()).filter(Boolean);
+        profile.dislikes = document.getElementById('inpDislikes').value.split(/[,、，]/).map(s => s.trim()).filter(Boolean);
+
+        profile.faceImageData = isSafeImageDataUrl(tempFaceData) ? tempFaceData : '';
+        profile.roomImageData = isSafeImageDataUrl(tempRoomData) ? tempRoomData : '';
+        profile.roomImages = {
+            morning: isSafeImageDataUrl(tempRoomMorning) ? tempRoomMorning : '',
+            evening: isSafeImageDataUrl(tempRoomEvening) ? tempRoomEvening : '',
+            night: isSafeImageDataUrl(tempRoomNight) ? tempRoomNight : ''
+        };
+        profile.enableDayNightEffect = Boolean(document.getElementById('chkDayNightEffect').checked);
+
+        charObj.habits = createEmptyHabits(profile.hobbies, charObj.habits);
+
+        applyScheduleForCurrentHour(charObj, false);
+        state.currentSpeech = generateContextualMonologue(profile, state);
+
+        if (!saveStorage()) {
+            charactersMap[activeCharId] = JSON.parse(backupStr);
+            return;
+        }
+
+        renderAll();
+        document.getElementById('modalSettings').classList.remove('active');
+        if (hobbyTruncated) {
+            showToast('趣味は最大5個まで登録されるため、先頭5個で保存しました');
+        } else if (autoClearedBreak) {
+            showToast('設定を保存しました（休憩時間が睡眠時間と重なったため休憩なしに自動調整しました）');
+        } else {
+            showToast('設定を保存し、キャラクターの生活モデルと口調を反映しました');
+        }
+
+        const res = await updateSpeechWithLLM(charObj, 'monologue');
+        if (res.ok) {
+            saveStorage();
+            renderAll();
+        }
+    });
+
+    function renderMemoriesModalContent() {
+        const { profile, memories } = getActiveChar();
+        const charName = profile.name || '住人';
+        const memTitleEl = document.getElementById('uiMemoriesModalTitle');
+        if (memTitleEl) memTitleEl.textContent = `📖 ${charName}の日々の思い出（1日1ログ）`;
+        const memSubEl = document.getElementById('uiMemoriesSubTitle');
+        if (memSubEl) memSubEl.textContent = `${charName}自身の振り返り（1日につき1件記録されます）`;
+
+        const memEl = document.getElementById('uiMemoriesList');
+        if (!memories || memories.length === 0) {
+            memEl.innerHTML = `<div class="log-item" style="color:var(--sub-text);">まだ${escapeHtml(charName)}の記録された思い出はありません。</div>`;
+        } else {
+            memEl.innerHTML = memories.map(item => `
+                <div class="log-item">
+                    <div class="log-item-date">${escapeHtml(item.dayKey || item.dateStr)}</div>
+                    <div>${escapeHtml(item.text)}</div>
+                </div>
+            `).join('');
+        }
+    }
+
+    function renderDiaryModalContent() {
+        const { profile, diary } = getActiveChar();
+        const charName = profile.name || '住人';
+        const diaryTitleEl = document.getElementById('uiDiaryModalTitle');
+        if (diaryTitleEl) diaryTitleEl.textContent = `📝 ${charName}の観察日記`;
+        const diaryWriteEl = document.getElementById('uiDiaryWriteTitle');
+        if (diaryWriteEl) diaryWriteEl.textContent = `${charName}の様子を観察者メモに記帳する`;
+        const diaryHistEl = document.getElementById('uiDiaryHistoryTitle');
+        if (diaryHistEl) diaryHistEl.textContent = `これまでの観察日記（${charName}）`;
+        const diaryInpEl = document.getElementById('inpDiaryEntry');
+        if (diaryInpEl) diaryInpEl.placeholder = `${charName}の今日見かけた様子や気づきを記録（Enterでも記帳）...`;
+
+        const diaryEl = document.getElementById('uiDiaryList');
+        if (!diary || diary.length === 0) {
+            diaryEl.innerHTML = `<div class="log-item" style="color:var(--sub-text);">まだ${escapeHtml(charName)}の観察日記の記帳はありません。</div>`;
+        } else {
+            diaryEl.innerHTML = diary.map(item => `
+                <div class="log-item">
+                    <div class="log-item-date">${escapeHtml(item.dateStr)}</div>
+                    <div>${escapeHtml(item.text)}</div>
+                </div>
+            `).join('');
+        }
+    }
+
+    document.getElementById('btnOpenMemories').addEventListener('click', () => {
+        renderMemoriesModalContent();
+        document.getElementById('modalMemories').classList.add('active');
+    });
+
+    document.getElementById('btnOpenDiary').addEventListener('click', () => {
+        renderDiaryModalContent();
+        document.getElementById('modalDiary').classList.add('active');
+    });
+
+    function addDiaryEntryFromInput() {
+        const inp = document.getElementById('inpDiaryEntry');
+        const text = inp.value.trim();
+        if (!text) return;
+
+        const charObj = getActiveChar();
+        if (!Array.isArray(charObj.diary)) charObj.diary = [];
+        charObj.diary.unshift({
+            dateStr: formatStateDateTime(charObj.state),
+            text: text
+        });
+        if (!saveStorage()) {
+            charObj.diary.shift();
+            return;
+        }
+        inp.value = '';
+        renderDiaryModalContent();
+        showToast('観察日記に記帳しました');
+    }
+
+    document.getElementById('btnAddDiary').addEventListener('click', addDiaryEntryFromInput);
+
+    document.getElementById('inpDiaryEntry').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) {
+            e.preventDefault();
+            addDiaryEntryFromInput();
+        }
+    });
+
+    function updateLlmProviderVisibility() {
+        const provider = document.getElementById('selLlmProvider').value;
+        document.getElementById('llmLocalConfigArea').style.display = (provider === 'local_openai') ? 'flex' : 'none';
+        document.getElementById('llmGeminiConfigArea').style.display = (provider === 'gemini') ? 'flex' : 'none';
+        updateLlmConnectionBadge(provider);
+    }
+
+    function updateLlmConnectionBadge(providerOverride) {
+        const badge = document.getElementById('uiLlmConnectionBadge');
+        if (!badge) return;
+        const currentProvider = providerOverride || llmConfig.provider || 'offline';
+        const apiKeyVal = (document.getElementById('inpGeminiApiKey')?.value ?? llmConfig.geminiApiKey ?? '').trim();
+
+        if (currentProvider === 'offline') {
+            badge.textContent = '📴 オフラインモード';
+            badge.className = 'llm-status-badge offline';
+        } else if (currentProvider === 'local_openai') {
+            badge.textContent = '🟢 接続設定済（ローカルLLM）';
+            badge.className = 'llm-status-badge connected';
+        } else {
+            if (!apiKeyVal) {
+                badge.textContent = '📴 オフライン動作（APIキー未入力）';
+                badge.className = 'llm-status-badge offline';
+            } else {
+                badge.textContent = '🟢 接続設定済（Gemini API）';
+                badge.className = 'llm-status-badge connected';
+            }
+        }
+    }
+
+    document.getElementById('inpGeminiApiKey').addEventListener('input', () => {
+        updateLlmConnectionBadge(document.getElementById('selLlmProvider').value);
+    });
+
+    function applyLlmConfigFromInputs() {
+        llmConfig.provider = document.getElementById('selLlmProvider').value;
+        let endpoint = document.getElementById('inpLlmEndpoint').value.trim() || 'http://localhost:1234/v1/chat/completions';
+        if (endpoint.endsWith('/v1') || endpoint.endsWith('/v1/')) {
+            endpoint = endpoint.replace(/\/$/, '') + '/chat/completions';
+            document.getElementById('inpLlmEndpoint').value = endpoint;
+        }
+        llmConfig.localEndpoint = endpoint;
+        llmConfig.localModel = document.getElementById('inpLlmModel').value.trim() || 'local-model';
+        llmConfig.geminiApiKey = document.getElementById('inpGeminiApiKey').value.trim();
+        llmConfig.geminiModel = document.getElementById('inpGeminiModel').value.trim() || 'gemini-3-flash-preview';
+        hasNotifiedGeminiAuthIssue = false;
+        updateLlmConnectionBadge(llmConfig.provider);
+    }
+
+    function renderDataModalContent() {
+        resetDeleteButtonState();
+        resetConfirmStep = false;
+        document.getElementById('btnResetStorage').textContent = '初期状態にリセット';
+        pendingImportedChar = null;
+        const conflictBox = document.getElementById('uiImportConflictBox');
+        if (conflictBox) conflictBox.style.display = 'none';
+
+        const sel = document.getElementById('selCharSwitch');
+        sel.innerHTML = '';
+        Object.values(charactersMap).forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.profile.id;
+            opt.textContent = `${c.profile.name}（${c.profile.job || c.profile.lifeStyle}）`;
+            if (c.profile.id === activeCharId) opt.selected = true;
+            sel.appendChild(opt);
+        });
+
+        document.getElementById('selLlmProvider').value = llmConfig.provider || 'offline';
+        document.getElementById('inpLlmEndpoint').value = llmConfig.localEndpoint || 'http://localhost:1234/v1/chat/completions';
+        document.getElementById('inpLlmModel').value = llmConfig.localModel || 'local-model';
+        document.getElementById('inpGeminiApiKey').value = llmConfig.geminiApiKey || '';
+        document.getElementById('inpGeminiModel').value = llmConfig.geminiModel || 'gemini-3-flash-preview';
+        updateLlmProviderVisibility();
+    }
+
+    document.getElementById('selLlmProvider').addEventListener('change', updateLlmProviderVisibility);
+
+    document.getElementById('btnSaveLlmConfig').addEventListener('click', () => {
+        applyLlmConfigFromInputs();
+        if (saveStorage()) {
+            showToast('LLM接続設定を保存しました');
+        }
+    });
+
+    document.getElementById('btnTestLlm').addEventListener('click', async () => {
+        applyLlmConfigFromInputs();
+        saveStorage();
+
+        const statusEl = document.getElementById('uiLlmTestResult');
+        const charObj = getActiveChar();
+
+        if (llmConfig.provider === 'offline') {
+            charObj.state.currentSpeech = generateContextualMonologue(charObj.profile, charObj.state);
+            saveStorage();
+            renderAll();
+            statusEl.textContent = `オフラインモード（時間帯・状況連動）：${charObj.state.currentSpeech.split('\n')[0]}`;
+            return;
+        }
+
+        const isSleepingNow = (charObj.state.actionType === 'sleep');
+        statusEl.textContent = isSleepingNow
+            ? `「${charObj.profile.name}」は現在就寝中のため、起床時の仮シチュエーションで接続テスト中...`
+            : `「${charObj.profile.name}」の設定でセリフを生成中...`;
+
+        const res = await updateSpeechWithLLM(charObj, 'monologue', '', { isTest: true });
+        if (res.ok) {
+            saveStorage();
+            renderAll();
+            statusEl.textContent = isSleepingNow
+                ? `✅ 接続・生成成功（現在就寝中のためテスト結果のみ表示）: ${res.text}`
+                : `✅ 生成成功: ${res.text}`;
+        } else {
+            statusEl.textContent = '⚠️ 生成に失敗したためフォールバック表示を維持しました（APIキー・URL・モデル名・CORS設定をご確認ください）';
+        }
+    });
+
+    document.getElementById('btnOpenData').addEventListener('click', () => {
+        renderDataModalContent();
+        document.getElementById('modalData').classList.add('active');
+    });
+
+    document.getElementById('selCharSwitch').addEventListener('change', async (e) => {
+        resetDeleteButtonState();
+        cancelInFlightLlm();
+        clearThoughtChoicesUI();
+
+        if (charactersMap[e.target.value]) {
+            activeCharId = e.target.value;
+            const charObj = getActiveChar();
+            saveStorage();
+            renderAll();
+            renderDiaryModalContent();
+            renderMemoriesModalContent();
+            showToast(`${charObj.profile.name}の部屋に切り替えました`);
+
+            if (charObj.state.currentSpeech && charObj.state.currentSpeech.startsWith('（') && charObj.state.actionType !== 'sleep') {
+                const res = await updateSpeechWithLLM(charObj, 'monologue');
+                if (res.ok) {
+                    saveStorage();
+                    renderAll();
+                }
+            }
+        }
+    });
+
+    document.getElementById('btnNewCharacter').addEventListener('click', () => {
+        resetDeleteButtonState();
+        cancelInFlightLlm();
+        clearThoughtChoicesUI();
+
+        const newId = 'char_' + Date.now();
+        const count = Object.keys(charactersMap).length + 1;
+        const defaultName = `新しい住人${count}`;
+        const newChar = createBlankCharacter(newId, defaultName);
+        charactersMap[newId] = newChar;
+        const prevActive = activeCharId;
+        activeCharId = newId;
+        if (!saveStorage()) {
+            delete charactersMap[newId];
+            activeCharId = prevActive;
+            return;
+        }
+        renderAll();
+        document.getElementById('modalData').classList.remove('active');
+        openSettingsModal();
+        showToast('新しい住人を迎えました。プリセット等から性格や口調を設定してください');
+    });
+
+    document.getElementById('btnDeleteCharacter').addEventListener('click', (e) => {
+        if (Object.keys(charactersMap).length <= 1) {
+            showToast('最後の1人は削除できません');
+            return;
+        }
+        const currentChar = getActiveChar();
+        const currentName = currentChar?.profile?.name || '住人';
+        if (!deleteConfirmStep) {
+            deleteConfirmStep = true;
+            e.target.textContent = `「${currentName}」を本当に削除する（再クリック）`;
+            return;
+        }
+        cancelInFlightLlm();
+        clearThoughtChoicesUI();
+        delete charactersMap[activeCharId];
+        activeCharId = Object.keys(charactersMap)[0];
+        saveStorage();
+        renderDataModalContent();
+        renderAll();
+        showToast(`「${currentName}」のデータを削除しました`);
+    });
+
+    document.getElementById('btnExportJson').addEventListener('click', () => {
+        const charObj = getActiveChar();
+        const jsonStr = JSON.stringify(charObj, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `hakoniwa_${charObj.profile.name}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        showToast('JSONデータを書き出しました');
+    });
+
+    let pendingImportedChar = null;
+
+    function finalizeCharacterImport(sanitized, mode = 'overwrite') {
+        let targetId = sanitized.profile.id;
+        if (mode === 'new' || (mode !== 'overwrite' && charactersMap[targetId])) {
+            targetId = 'char_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+            sanitized.profile.id = targetId;
+        }
+
+        cancelInFlightLlm();
+        clearThoughtChoicesUI();
+        const prevActive = activeCharId;
+        const prevExisting = charactersMap[targetId] ? JSON.stringify(charactersMap[targetId]) : null;
+
+        charactersMap[targetId] = sanitized;
+        activeCharId = targetId;
+        if (!saveStorage()) {
+            if (prevExisting) {
+                charactersMap[targetId] = JSON.parse(prevExisting);
+            } else {
+                delete charactersMap[targetId];
+            }
+            activeCharId = prevActive;
+            return;
+        }
+
+        pendingImportedChar = null;
+        document.getElementById('uiImportConflictBox').style.display = 'none';
+        renderDataModalContent();
+        renderAll();
+        showToast(
+            mode === 'new'
+                ? `「${sanitized.profile.name}」を別の住人として追加しました`
+                : `「${sanitized.profile.name}」のデータを読み込みました`
+        );
+    }
+
+    document.getElementById('inpImportJson').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            try {
+                const rawImported = JSON.parse(ev.target.result);
+                if (!rawImported || typeof rawImported !== 'object' || !rawImported.profile || !rawImported.state) {
+                    showToast('データ形式が正しくありません');
+                    return;
+                }
+
+                const sanitized = normalizeAndSanitizeCharacter(rawImported);
+                const targetId = sanitized.profile.id;
+
+                if (charactersMap[targetId]) {
+                    pendingImportedChar = sanitized;
+                    const existingName = charactersMap[targetId].profile.name || '住人';
+                    document.getElementById('uiImportConflictText').textContent =
+                        `同じIDの住人「${existingName}」が既に存在します。上書きして復元しますか？それとも別の住人として追加しますか？`;
+                    document.getElementById('uiImportConflictBox').style.display = 'flex';
+                    return;
+                }
+
+                finalizeCharacterImport(sanitized, 'overwrite');
+            } catch (err) {
+                showToast('JSONの読み込みに失敗しました');
+            }
+        };
+        reader.readAsText(file);
+        e.target.value = '';
+    });
+
+    document.getElementById('btnImportOverwrite').addEventListener('click', () => {
+        if (!pendingImportedChar) return;
+        finalizeCharacterImport(pendingImportedChar, 'overwrite');
+    });
+
+    document.getElementById('btnImportAsNew').addEventListener('click', () => {
+        if (!pendingImportedChar) return;
+        finalizeCharacterImport(pendingImportedChar, 'new');
+    });
+
+    document.getElementById('btnImportCancel').addEventListener('click', () => {
+        pendingImportedChar = null;
+        document.getElementById('uiImportConflictBox').style.display = 'none';
+    });
+
+    document.getElementById('btnResetStorage').addEventListener('click', (e) => {
+        if (!resetConfirmStep) {
+            resetConfirmStep = true;
+            e.target.textContent = '本当にリセットする（再クリック）';
+            return;
+        }
+        cancelInFlightLlm();
+        clearThoughtChoicesUI();
+        const alma = createDefaultCharacterAlma();
+        charactersMap = { [alma.profile.id]: alma };
+        activeCharId = alma.profile.id;
+        llmConfig = createDefaultLlmConfig();
+        saveStorage();
+        renderDataModalContent();
+        renderAll();
+        showToast('初期データ（アルマ・オフラインモード）にリセットしました');
+    });
+
+    document.querySelectorAll('[data-close]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const targetId = btn.getAttribute('data-close');
+            document.getElementById(targetId).classList.remove('active');
+        });
+    });
+
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+        let mousedownTarget = null;
+        overlay.addEventListener('mousedown', (e) => {
+            mousedownTarget = e.target;
+        });
+        overlay.addEventListener('click', (e) => {
+            if (overlay.id === 'modalSettings') {
+                mousedownTarget = null;
+                return;
+            }
+            if (e.target === overlay && mousedownTarget === overlay) {
+                overlay.classList.remove('active');
+            }
+            mousedownTarget = null;
+        });
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !e.isComposing && e.keyCode !== 229) {
+            const activeModals = document.querySelectorAll('.modal-overlay.active');
+            if (activeModals.length > 0) {
+                const topModal = activeModals[activeModals.length - 1];
+                if (topModal.id === 'modalSettings') return;
+                topModal.classList.remove('active');
+            }
+        }
+    });
+
+    initScheduleSelects();
+    loadStorage();
+    renderAll();
+});
+</script>
+</body>
+</html>
