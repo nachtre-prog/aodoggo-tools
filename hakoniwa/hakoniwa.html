@@ -1386,6 +1386,8 @@
  * - 24時間円環スケジュール計算（ほぼ1日中寝ている過眠キャラ・終日睡眠・睡眠なし24時間稼働・完全夜行性対応）
  * - 夜行性（18時起床など）での独立朝食枠と夕食枠の衝突回避を実装
  * - 旧セーブデータの進行状況・日記・思い出の安全な引き継ぎ＆旧出勤スケジュールの自動補正を実装
+ * - 新規住人追加時の初期観察日記を「（キャラ名）の暮らしの観察を始めた。」に部分置換で安全に同期
+ * - JSONインポート時に初期アルマと同IDの別名キャラは即座に新規追加し、同ID・同名の上書き時は確認UIを表示
  * - LLMプロンプトに「日本語以外の言語の混入禁止」の厳格な制約を追加
  * - 初期状態は「オフラインモード（provider: 'offline'）」から開始
  */
@@ -1700,7 +1702,7 @@ function createDefaultCharacterAlma() {
     };
 }
 
-function createBlankCharacter(newId, defaultName) {
+function createBlankCharacter(newId, defaultName = '新しい住人') {
     const hobbies = ['読書', '散歩'];
     return {
         profile: {
@@ -1766,6 +1768,40 @@ function createBlankCharacter(newId, defaultName) {
     };
 }
 
+/**
+ * 観察日記内の初期自動記帳の文言部分だけを現在のキャラ名に部分置換で同期する（後半の文章やユーザー追記を消さない）
+ */
+function syncInitialObservationDiaryName(diaryArr, newName, prevName = '') {
+    if (!Array.isArray(diaryArr) || !newName) return;
+    const targetPhrase = `${newName}の暮らしの観察を始めた。`;
+
+    diaryArr.forEach(entry => {
+        if (!entry || typeof entry.text !== 'string') return;
+        let updated = entry.text;
+
+        if (!/^新しい住人\d*$/.test(newName)) {
+            updated = updated.replace(/新しい住人\d*の暮らしの観察を始めた。/g, targetPhrase);
+        }
+        if (newName !== '名無しの住人') {
+            updated = updated.replace(/名無しの住人の暮らしの観察を始めた。/g, targetPhrase);
+        }
+        if (prevName && prevName !== newName) {
+            if (prevName === 'アルマ') {
+                updated = updated.replace(/魔法学校の生徒・アルマの暮らしの観察を始めた。/g, targetPhrase);
+                updated = updated.replace(/結晶学者・アルマの暮らしの観察を始めた。/g, targetPhrase);
+            }
+            updated = updated.split(`${prevName}の暮らしの観察を始めた。`).join(targetPhrase);
+        }
+        if (newName !== 'アルマ') {
+            updated = updated.replace(/魔法学校の生徒・アルマの暮らしの観察を始めた。/g, targetPhrase);
+            updated = updated.replace(/結晶学者・アルマの暮らしの観察を始めた。/g, targetPhrase);
+            updated = updated.replace(/アルマの暮らしの観察を始めた。/g, targetPhrase);
+        }
+
+        entry.text = updated;
+    });
+}
+
 function getSeasonByMonth(month) {
     if (month >= 3 && month <= 5) return '春';
     if (month >= 6 && month <= 8) return '夏';
@@ -1803,33 +1839,90 @@ function isHourInWorkRange(hour, start, end) {
     return elapsed < workDuration;
 }
 
+/**
+ * 読み込まれたJSONオブジェクトから住人データ（1人または複数人）を抽出するヘルパー
+ */
+function extractRawCharactersFromJson(rawImported) {
+    if (!rawImported || typeof rawImported !== 'object') return [];
+
+    if (Array.isArray(rawImported)) {
+        return rawImported.map(item => extractRawCharactersFromJson(item)).flat();
+    }
+
+    if (rawImported.profile && typeof rawImported.profile === 'object') {
+        return [rawImported];
+    }
+
+    if (
+        typeof rawImported.name === 'string' ||
+        rawImported.hobbies !== undefined ||
+        rawImported.speechSamples !== undefined ||
+        rawImported.schedule !== undefined
+    ) {
+        return [{
+            profile: rawImported,
+            state: (rawImported.state && typeof rawImported.state === 'object') ? rawImported.state : {},
+            habits: (rawImported.habits && typeof rawImported.habits === 'object') ? rawImported.habits : null,
+            memories: Array.isArray(rawImported.memories) ? rawImported.memories : null,
+            diary: Array.isArray(rawImported.diary) ? rawImported.diary : null
+        }];
+    }
+
+    const values = Object.values(rawImported);
+    const mapCandidates = values.filter(v => v && typeof v === 'object' && (v.profile || typeof v.name === 'string'));
+    if (mapCandidates.length > 0) {
+        return mapCandidates.map(item => extractRawCharactersFromJson(item)).flat();
+    }
+
+    return [];
+}
+
 function normalizeAndSanitizeCharacter(raw, fallbackId = '') {
-    const baseId = (raw && raw.profile && typeof raw.profile.id === 'string' && raw.profile.id.trim())
-        ? raw.profile.id.trim()
+    const rawProf = (raw && typeof raw.profile === 'object' && raw.profile)
+        ? raw.profile
+        : ((raw && typeof raw === 'object') ? raw : {});
+    const rawState = (raw && typeof raw.state === 'object' && raw.state) ? raw.state : {};
+
+    const baseId = (typeof rawProf.id === 'string' && rawProf.id.trim())
+        ? rawProf.id.trim()
         : (fallbackId || ('char_' + Date.now()));
-    const baseName = (raw && raw.profile && typeof raw.profile.name === 'string' && raw.profile.name.trim())
-        ? raw.profile.name.trim()
+    const baseName = (typeof rawProf.name === 'string' && rawProf.name.trim())
+        ? rawProf.name.trim()
         : '名無しの住人';
 
     const blank = createBlankCharacter(baseId, baseName);
-    const rawProf = (raw && typeof raw.profile === 'object' && raw.profile) ? raw.profile : {};
-    const rawState = (raw && typeof raw.state === 'object' && raw.state) ? raw.state : {};
     const rawSch = (rawProf.schedule && typeof rawProf.schedule === 'object') ? rawProf.schedule : {};
     const rawMeal = (rawProf.mealSettings && typeof rawProf.mealSettings === 'object') ? rawProf.mealSettings : {};
     const rawRoomImgs = (rawProf.roomImages && typeof rawProf.roomImages === 'object') ? rawProf.roomImages : {};
 
-    const cleanStrArray = (arr, fallbackArr, maxLen = 20) => {
-        if (!Array.isArray(arr)) return [...fallbackArr];
-        const filtered = arr.map(v => String(v ?? '').trim()).filter(Boolean);
-        return filtered.length > 0 ? filtered.slice(0, maxLen) : [...fallbackArr];
+    const cleanStrArray = (val, fallbackArr, maxLen = 20) => {
+        if (Array.isArray(val)) {
+            const filtered = val.map(v => String(v ?? '').trim()).filter(Boolean);
+            return filtered.length > 0 ? filtered.slice(0, maxLen) : [...fallbackArr];
+        }
+        if (typeof val === 'string' && val.trim()) {
+            const filtered = val.split(/[,、，\n]/).map(s => s.trim()).filter(Boolean);
+            return filtered.length > 0 ? filtered.slice(0, maxLen) : [...fallbackArr];
+        }
+        return [...fallbackArr];
+    };
+
+    const parseSpeechSamples = (val) => {
+        if (Array.isArray(val)) {
+            return val.map(s => String(s ?? '').trim()).filter(Boolean).slice(0, 150);
+        }
+        if (typeof val === 'string' && val.trim()) {
+            return val.split(/\r?\n/).map(s => s.trim()).filter(Boolean).slice(0, 150);
+        }
+        return [];
     };
 
     const hobbies = cleanStrArray(rawProf.hobbies, blank.profile.hobbies, 5);
-    const lifeStyle = Object.prototype.hasOwnProperty.call(LIFESTYLE_MODELS, rawProf.lifeStyle)
-        ? rawProf.lifeStyle
+    const rawLifeStyle = rawProf.lifeStyle || rawProf.lifestyle || '';
+    const lifeStyle = Object.prototype.hasOwnProperty.call(LIFESTYLE_MODELS, rawLifeStyle)
+        ? rawLifeStyle
         : '社会人';
 
-    // wake: null（終日睡眠）または 0〜23
     let wake = 7;
     if (rawSch.wake === null || rawSch.wake === 'null' || lifeStyle === '冬眠・終日睡眠') {
         wake = null;
@@ -1838,7 +1931,6 @@ function normalizeAndSanitizeCharacter(raw, fallbackId = '') {
         wake = (Number.isFinite(parsedWake) && parsedWake >= 0 && parsedWake <= 23) ? parsedWake : 7;
     }
 
-    // sleep: null（睡眠なし・24時間稼働）または 0〜29
     let sleep = 23;
     if (wake === null) {
         sleep = 0;
@@ -1868,11 +1960,9 @@ function normalizeAndSanitizeCharacter(raw, fallbackId = '') {
     } else if (wake !== null && sleep !== null) {
         const awakeDur = hoursSince(sleep, wake);
         if (awakeDur < 3) {
-            // 起きている時間が1〜2時間しかなく出勤・帰宅が物理的に入らない場合のみ予定なしにする
             start = null;
             end = null;
         } else {
-            // 旧データ（例：wake 8 / start 8 や end >= sleep）で勤務予定が消えないよう自動補正する
             let sOff = hoursSince(start, wake);
             let eOff = hoursSince(end, wake);
             if (sOff < 1 || sOff >= awakeDur - 1) {
@@ -1903,7 +1993,9 @@ function normalizeAndSanitizeCharacter(raw, fallbackId = '') {
 
     const holidays = Array.isArray(rawProf.holidays)
         ? rawProf.holidays.map(d => String(d ?? '').trim()).filter(d => DAYS_JP.includes(d))
-        : ['日', '土'];
+        : (typeof rawProf.holidays === 'string'
+            ? rawProf.holidays.split(/[,、，\s]/).map(d => d.trim()).filter(d => DAYS_JP.includes(d))
+            : ['日', '土']);
 
     const profile = {
         id: baseId,
@@ -1911,16 +2003,16 @@ function normalizeAndSanitizeCharacter(raw, fallbackId = '') {
         job: typeof rawProf.job === 'string' ? rawProf.job.trim() : '',
         workplace: typeof rawProf.workplace === 'string' ? rawProf.workplace.trim() : '',
         affiliation: typeof rawProf.affiliation === 'string' ? rawProf.affiliation.trim() : '',
-        summary: typeof rawProf.summary === 'string' ? rawProf.summary.trim() : '',
-        tone: typeof rawProf.tone === 'string' ? rawProf.tone.trim() : '',
-        speechSamples: Array.isArray(rawProf.speechSamples)
-            ? rawProf.speechSamples.map(s => String(s ?? '').trim()).filter(Boolean).slice(0, 150)
-            : [],
-        likes: Array.isArray(rawProf.likes)
-            ? rawProf.likes.map(s => String(s ?? '').trim()).filter(Boolean).slice(0, 20)
-            : ['お茶'],
-        dislikes: Array.isArray(rawProf.dislikes)
-            ? rawProf.dislikes.map(s => String(s ?? '').trim()).filter(Boolean).slice(0, 20)
+        summary: typeof (rawProf.summary ?? rawProf.description ?? rawProf.bio) === 'string'
+            ? String(rawProf.summary ?? rawProf.description ?? rawProf.bio).trim()
+            : '',
+        tone: typeof (rawProf.tone ?? rawProf.speechTone) === 'string'
+            ? String(rawProf.tone ?? rawProf.speechTone).trim()
+            : '',
+        speechSamples: parseSpeechSamples(rawProf.speechSamples ?? rawProf.samples),
+        likes: cleanStrArray(rawProf.likes, ['お茶'], 20),
+        dislikes: (rawProf.dislikes !== undefined && rawProf.dislikes !== null && String(rawProf.dislikes).trim() !== '')
+            ? cleanStrArray(rawProf.dislikes, [], 20)
             : [],
         hobbies: hobbies,
         lifeStyle: lifeStyle,
@@ -1954,6 +2046,13 @@ function normalizeAndSanitizeCharacter(raw, fallbackId = '') {
         ? rawState.currentHobby
         : (actionType === 'hobby' ? hobbies[0] : null);
 
+    let initialSpeech = typeof rawState.currentSpeech === 'string' && rawState.currentSpeech.trim()
+        ? rawState.currentSpeech.trim()
+        : blank.state.currentSpeech;
+    if (!/^新しい住人\d*$/.test(baseName) && /^（新しい住人\d*は/.test(initialSpeech)) {
+        initialSpeech = initialSpeech.replace(/^（新しい住人\d*は/, `（${baseName}は`);
+    }
+
     const state = {
         year,
         season: getSeasonByMonth(month),
@@ -1968,9 +2067,7 @@ function normalizeAndSanitizeCharacter(raw, fallbackId = '') {
         currentHobby,
         hobbyBlockHours: Number.isFinite(Number(rawState.hobbyBlockHours)) ? Math.max(0, Math.floor(Number(rawState.hobbyBlockHours))) : 1,
         hobbyTargetHours: Number.isFinite(Number(rawState.hobbyTargetHours)) ? Math.max(2, Math.min(5, Math.floor(Number(rawState.hobbyTargetHours)))) : 3,
-        currentSpeech: typeof rawState.currentSpeech === 'string' && rawState.currentSpeech.trim()
-            ? rawState.currentSpeech.trim()
-            : blank.state.currentSpeech,
+        currentSpeech: initialSpeech,
         pendingThought: null,
         lastTalkedTimeKey: typeof rawState.lastTalkedTimeKey === 'string' ? rawState.lastTalkedTimeKey : ''
     };
@@ -1999,7 +2096,17 @@ function normalizeAndSanitizeCharacter(raw, fallbackId = '') {
             .slice(0, 200)
         : blank.diary;
 
-    return { profile, state, habits, memories, diary };
+    syncInitialObservationDiaryName(diary, baseName);
+
+    const charResult = { profile, state, habits, memories, diary };
+
+    applyScheduleForCurrentHour(charResult, false);
+    const defaultAlmaSpeech = '「…おはよ。休日の朝はまだ少し眠いな。目を覚ますついでに、甘いクッキーでも焼くとしよう。」';
+    if (!rawState.currentSpeech || (baseName !== 'アルマ' && state.currentSpeech === defaultAlmaSpeech)) {
+        state.currentSpeech = generateContextualMonologue(profile, state);
+    }
+
+    return charResult;
 }
 
 function getTimeKey(state) {
@@ -2062,7 +2169,6 @@ function upsertDailyMemory(charObj, newText, isPriorityEvent = false) {
 
 /**
  * 起床1時間後の「独立朝食枠（(wake+1)%24）」が発生するかどうかを判定して時刻を返す
- * - 睡眠あり、かつ覚醒時間が3時間以上あり、起床1時間後が出勤や昼休憩と重ならない場合に独立枠となる
  */
 function resolveStandaloneBreakfastHour(sch, meal, hasScheduledWork) {
     if (!meal || !meal.breakfast) return null;
@@ -2083,11 +2189,10 @@ function resolveStandaloneBreakfastHour(sch, meal, hasScheduledWork) {
 
 /**
  * 夕食時刻を算出する（24時間円環・夜行性・過眠・不眠対応）
- * - 起床1時間後の独立朝食枠（例：18時起床時の19時）と衝突しないよう除外判定を行う
  */
 function resolveDailyDinnerHour(sch, meal, hasScheduledWork) {
     if (!meal || !meal.dinner) return null;
-    if (sch.wake === null) return null; // 終日睡眠時は食事なし
+    if (sch.wake === null) return null;
 
     const awakeDuration = (sch.sleep === null) ? 24 : hoursSince(sch.sleep, sch.wake);
     if (awakeDuration <= 2) return null;
@@ -2105,7 +2210,6 @@ function resolveDailyDinnerHour(sch, meal, hasScheduledWork) {
         return true;
     };
 
-    // 第一候補：19:00（ただし勤務後が19:00以降になる場合は帰宅直後または帰宅時）
     let primary = 19;
     if (hasScheduledWork && endMod !== null) {
         if (sch.sleep !== null) {
@@ -2124,7 +2228,6 @@ function resolveDailyDinnerHour(sch, meal, hasScheduledWork) {
         return primary;
     }
 
-    // 夜行性などで19:00が睡眠中・起床直後（朝食枠）の場合：帰宅後や就寝前の空き時間を探す
     const fallbackCandidates = [];
     if (hasScheduledWork && endMod !== null) {
         fallbackCandidates.push((endMod + 1) % 24, endMod);
@@ -2418,7 +2521,6 @@ function maybeCreateThoughtEvent(profile, state) {
 
 /**
  * 設定変更時や時刻進行時に、現在の時刻・曜日のスケジュールに合わせて行動状態を更新する
- * （24時間円環・過眠・終日睡眠・不眠24時間稼働・夜行性すべてに対応）
  */
 function applyScheduleForCurrentHour(charObj, isHourlyStep = false) {
     const { profile, state, habits } = charObj;
@@ -2432,12 +2534,10 @@ function applyScheduleForCurrentHour(charObj, isHourlyStep = false) {
     const isSleepless = (sch.wake !== null && sch.sleep === null);
     const endMod = (hasScheduledWork && sch.end !== null) ? (sch.end % 24) : null;
 
-    // 独立朝食枠と夕食枠の解決（互いに衝突しないよう統一ヘルパーを使用）
     const standaloneBreakfastHour = resolveStandaloneBreakfastHour(sch, meal, hasScheduledWork);
     const hasMorningMargin = (standaloneBreakfastHour !== null);
     const dinnerHour = resolveDailyDinnerHour(sch, meal, hasScheduledWork);
 
-    // 1. 睡眠中判定（終日睡眠を含む）
     if (isHourSleeping(state.hour, sch.wake, sch.sleep)) {
         state.actionType = 'sleep';
         state.currentHobby = null;
@@ -2447,7 +2547,6 @@ function applyScheduleForCurrentHour(charObj, isHourlyStep = false) {
         return;
     }
 
-    // 2. 起床時刻（睡眠があるキャラのみ）または 24時間稼働キャラの朝食時刻
     if (!isSleepless && sch.wake !== null && state.hour === sch.wake) {
         state.actionType = 'morning';
         state.currentHobby = null;
@@ -2463,7 +2562,6 @@ function applyScheduleForCurrentHour(charObj, isHourlyStep = false) {
         return;
     }
 
-    // 3. 起床1時間後の独立朝食枠
     if (standaloneBreakfastHour !== null && state.hour === standaloneBreakfastHour) {
         state.actionType = 'meal';
         state.currentHobby = null;
@@ -2473,7 +2571,6 @@ function applyScheduleForCurrentHour(charObj, isHourlyStep = false) {
         return;
     }
 
-    // 4. メイン休憩・昼食時間
     if (meal.breakHour !== null && state.hour === meal.breakHour) {
         state.actionType = 'meal';
         const isLunchTime = (state.hour >= 11 && state.hour <= 14);
@@ -2486,7 +2583,6 @@ function applyScheduleForCurrentHour(charObj, isHourlyStep = false) {
         return;
     }
 
-    // 5. 仕事・学業・家事の活動時間
     if (hasScheduledWork && isHourInWorkRange(state.hour, sch.start, sch.end)) {
         state.actionType = 'work';
         state.currentHobby = null;
@@ -2496,7 +2592,6 @@ function applyScheduleForCurrentHour(charObj, isHourlyStep = false) {
         return;
     }
 
-    // 6. 帰宅・終了時刻
     if (hasScheduledWork && endMod !== null && state.hour === endMod) {
         if (dinnerHour !== null && dinnerHour === endMod) {
             state.actionType = 'meal';
@@ -2513,7 +2608,6 @@ function applyScheduleForCurrentHour(charObj, isHourlyStep = false) {
         return;
     }
 
-    // 7. 夕食時刻
     if (dinnerHour !== null && state.hour === dinnerHour) {
         state.actionType = 'meal';
         state.currentAction = '夕食をとり、くつろいでいる';
@@ -2521,7 +2615,6 @@ function applyScheduleForCurrentHour(charObj, isHourlyStep = false) {
         return;
     }
 
-    // 8. 自由時間（趣味の継続ブロック）
     if (!isHourlyStep) {
         if (!state.currentHobby || !profile.hobbies.includes(state.currentHobby)) {
             state.currentHobby = drawWeightedHobby(profile, habits, state.dayOfWeek);
@@ -2654,9 +2747,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     charactersMap = {};
                     Object.entries(parsed).forEach(([key, val]) => {
                         const normalized = normalizeAndSanitizeCharacter(val, key);
-                        if (normalized.profile.id === 'char_alma_default' && normalized.profile.job === '結晶学者') {
-                            // 旧デフォルトのアルマ（結晶学者）を検出した場合：
-                            // 進行状況（state）・観察日記（diary）・思い出（memories）・習慣（habits）・登録画像はすべて引き継ぎ、プロフィール設定のみ新アルマへ更新する
+                        const isUneditedOldAlma = (
+                            normalized.profile.id === 'char_alma_default' &&
+                            normalized.profile.name === 'アルマ' &&
+                            normalized.profile.job === '結晶学者' &&
+                            normalized.profile.workplace === '王立研究院' &&
+                            normalized.profile.lifeStyle === '社会人' &&
+                            normalized.profile.hobbies.join(',') === '読書,結晶観察,散歩'
+                        );
+                        if (isUneditedOldAlma) {
                             const freshAlma = createDefaultCharacterAlma();
                             normalized.profile = {
                                 ...freshAlma.profile,
@@ -2725,16 +2824,12 @@ document.addEventListener('DOMContentLoaded', () => {
             .replace(/"/g, '&quot;');
     }
 
-    /**
-     * スケジュール選択プルダウンを24時間＋日またぎ（翌05:00まで）＋睡眠なし・終日睡眠に対応させる
-     */
     function initScheduleSelects() {
         const formatHourOption = (h) => {
             if (h < 24) return `${String(h).padStart(2, '0')}:00`;
             return `${String(h).padStart(2, '0')}:00 (翌${String(h - 24).padStart(2, '0')}:00)`;
         };
 
-        // 起床時間（00:00〜23:00 ＋ 終日睡眠）
         const selWake = document.getElementById('selWake');
         selWake.innerHTML = '';
         const optAllSleep = document.createElement('option');
@@ -2748,7 +2843,6 @@ document.addEventListener('DOMContentLoaded', () => {
             selWake.appendChild(opt);
         }
 
-        // 出勤・開始（なし ＋ 00:00〜23:00）
         const selStart = document.getElementById('selStart');
         selStart.innerHTML = '';
         const optNoStart = document.createElement('option');
@@ -2762,7 +2856,6 @@ document.addEventListener('DOMContentLoaded', () => {
             selStart.appendChild(opt);
         }
 
-        // 帰宅・終了（なし ＋ 00:00〜29:00）
         const selEnd = document.getElementById('selEnd');
         selEnd.innerHTML = '';
         const optNoEnd = document.createElement('option');
@@ -2776,7 +2869,6 @@ document.addEventListener('DOMContentLoaded', () => {
             selEnd.appendChild(opt);
         }
 
-        // 就寝時間（なし：24時間稼働 ＋ 00:00〜29:00）
         const selSleep = document.getElementById('selSleep');
         selSleep.innerHTML = '';
         const optNoSleep = document.createElement('option');
@@ -2790,7 +2882,6 @@ document.addEventListener('DOMContentLoaded', () => {
             selSleep.appendChild(opt);
         }
 
-        // メイン休憩・軽食時間（なし ＋ 00:00〜23:00）
         const breakSel = document.getElementById('selMealBreak');
         if (breakSel) {
             breakSel.innerHTML = '';
@@ -2872,7 +2963,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const subParts = [profile.job, profile.workplace, profile.affiliation ? `（${profile.affiliation}）` : ''].filter(Boolean);
         document.getElementById('uiStatusSub').textContent = subParts.length > 0 ? subParts.join(' ') : profile.lifeStyle;
 
-        // スケジュール一覧の表示（終日睡眠・不眠24時間稼働・夜行性・過眠すべてに対応）
         const sch = profile.schedule || { wake: 7, start: 8, end: 18, sleep: 23 };
         const meal = profile.mealSettings || { breakfast: true, breakHour: 12, dinner: true };
         const model = LIFESTYLE_MODELS[profile.lifeStyle] || LIFESTYLE_MODELS['独自'];
@@ -3869,10 +3959,14 @@ ${profile.tone || '一人称は「私」。自然で落ち着いた口調で話�
         const { profile, state } = charObj;
         const backupStr = JSON.stringify(charObj);
 
-        profile.name = document.getElementById('inpName').value.trim() || '名無しの住人';
+        const prevName = profile.name || '';
+        const newName = document.getElementById('inpName').value.trim() || '名無しの住人';
+        profile.name = newName;
         profile.job = document.getElementById('inpJob').value.trim();
         profile.workplace = document.getElementById('inpWorkplace').value.trim();
         profile.affiliation = document.getElementById('inpAffiliation').value.trim();
+
+        syncInitialObservationDiaryName(charObj.diary, newName, prevName);
 
         const parsedHobbies = document.getElementById('inpHobbies').value
             .split(/[,、，]/)
@@ -4086,10 +4180,21 @@ ${profile.tone || '一人称は「私」。自然で落ち着いた口調で話�
 
         const sel = document.getElementById('selCharSwitch');
         sel.innerHTML = '';
-        Object.values(charactersMap).forEach(c => {
+        const allChars = Object.values(charactersMap);
+        const nameTotals = {};
+        allChars.forEach(c => {
+            const nm = c.profile.name || '住人';
+            nameTotals[nm] = (nameTotals[nm] || 0) + 1;
+        });
+        const nameIndices = {};
+
+        allChars.forEach(c => {
             const opt = document.createElement('option');
             opt.value = c.profile.id;
-            opt.textContent = `${c.profile.name}（${c.profile.job || c.profile.lifeStyle}）`;
+            const nm = c.profile.name || '住人';
+            nameIndices[nm] = (nameIndices[nm] || 0) + 1;
+            const displayName = nameTotals[nm] > 1 ? `${nm} (${nameIndices[nm]})` : nm;
+            opt.textContent = `${displayName}（${c.profile.job || c.profile.lifeStyle}）`;
             if (c.profile.id === activeCharId) opt.selected = true;
             sel.appendChild(opt);
         });
@@ -4178,8 +4283,7 @@ ${profile.tone || '一人称は「私」。自然で落ち着いた口調で話�
         clearThoughtChoicesUI();
 
         const newId = 'char_' + Date.now();
-        const count = Object.keys(charactersMap).length + 1;
-        const defaultName = `新しい住人${count}`;
+        const defaultName = '新しい住人';
         const newChar = createBlankCharacter(newId, defaultName);
         charactersMap[newId] = newChar;
         const prevActive = activeCharId;
@@ -4236,7 +4340,7 @@ ${profile.tone || '一人称は「私」。自然で落ち着いた口調で話�
 
     function finalizeCharacterImport(sanitized, mode = 'overwrite') {
         let targetId = sanitized.profile.id;
-        if (mode === 'new' || (mode !== 'overwrite' && charactersMap[targetId])) {
+        if (mode === 'new' && charactersMap[targetId]) {
             targetId = 'char_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
             sanitized.profile.id = targetId;
         }
@@ -4259,13 +4363,17 @@ ${profile.tone || '一人称は「私」。自然で落ち着いた口調で話�
         }
 
         pendingImportedChar = null;
-        document.getElementById('uiImportConflictBox').style.display = 'none';
+        const conflictBox = document.getElementById('uiImportConflictBox');
+        if (conflictBox) conflictBox.style.display = 'none';
         renderDataModalContent();
         renderAll();
+        renderDiaryModalContent();
+        renderMemoriesModalContent();
+        document.getElementById('modalData').classList.remove('active');
         showToast(
             mode === 'new'
-                ? `「${sanitized.profile.name}」を別の住人として追加しました`
-                : `「${sanitized.profile.name}」のデータを読み込みました`
+                ? `「${sanitized.profile.name}」を新しい住人として迎え入れ、部屋を切り替えました`
+                : `「${sanitized.profile.name}」のデータを読み込み、部屋に反映しました`
         );
     }
 
@@ -4276,24 +4384,71 @@ ${profile.tone || '一人称は「私」。自然で落ち着いた口調で話�
         reader.onload = (ev) => {
             try {
                 const rawImported = JSON.parse(ev.target.result);
-                if (!rawImported || typeof rawImported !== 'object' || !rawImported.profile || !rawImported.state) {
-                    showToast('データ形式が正しくありません');
+                const extractedList = extractRawCharactersFromJson(rawImported);
+                if (extractedList.length === 0) {
+                    showToast('住人データが見つかりませんでした。JSONファイルをご確認ください');
                     return;
                 }
 
-                const sanitized = normalizeAndSanitizeCharacter(rawImported);
-                const targetId = sanitized.profile.id;
+                if (extractedList.length === 1) {
+                    const sanitized = normalizeAndSanitizeCharacter(extractedList[0]);
+                    const targetId = sanitized.profile.id;
+                    const existingAtId = charactersMap[targetId];
 
-                if (charactersMap[targetId]) {
-                    pendingImportedChar = sanitized;
-                    const existingName = charactersMap[targetId].profile.name || '住人';
-                    document.getElementById('uiImportConflictText').textContent =
-                        `同じIDの住人「${existingName}」が既に存在します。上書きして復元しますか？それとも別の住人として追加しますか？`;
-                    document.getElementById('uiImportConflictBox').style.display = 'flex';
+                    if (existingAtId) {
+                        const existingName = (existingAtId.profile.name || '').trim();
+                        const importedName = (sanitized.profile.name || '').trim();
+
+                        if (existingName !== importedName) {
+                            finalizeCharacterImport(sanitized, 'new');
+                            return;
+                        }
+
+                        pendingImportedChar = sanitized;
+                        document.getElementById('uiImportConflictText').textContent =
+                            `同じIDの住人「${existingName}」が既に存在します。既存のデータを上書きして復元しますか？それとも別の住人として追加しますか？`;
+                        document.getElementById('uiImportConflictBox').style.display = 'flex';
+                        return;
+                    }
+
+                    finalizeCharacterImport(sanitized, 'overwrite');
                     return;
                 }
 
-                finalizeCharacterImport(sanitized, 'overwrite');
+                const backupAllStr = JSON.stringify(charactersMap);
+                const prevActive = activeCharId;
+                let lastImportedChar = null;
+
+                extractedList.forEach((rawChar, idx) => {
+                    const sanitized = normalizeAndSanitizeCharacter(rawChar);
+                    let targetId = sanitized.profile.id;
+                    if (charactersMap[targetId]) {
+                        targetId = 'char_' + Date.now() + '_' + idx + '_' + Math.floor(Math.random() * 1000);
+                        sanitized.profile.id = targetId;
+                    }
+                    charactersMap[targetId] = sanitized;
+                    activeCharId = targetId;
+                    lastImportedChar = sanitized;
+                });
+
+                if (lastImportedChar) {
+                    cancelInFlightLlm();
+                    clearThoughtChoicesUI();
+                    if (!saveStorage()) {
+                        charactersMap = JSON.parse(backupAllStr);
+                        activeCharId = prevActive;
+                        return;
+                    }
+                    pendingImportedChar = null;
+                    const conflictBox = document.getElementById('uiImportConflictBox');
+                    if (conflictBox) conflictBox.style.display = 'none';
+                    renderDataModalContent();
+                    renderAll();
+                    renderDiaryModalContent();
+                    renderMemoriesModalContent();
+                    document.getElementById('modalData').classList.remove('active');
+                    showToast(`${extractedList.length}人の住人データを読み込み、「${lastImportedChar.profile.name}」の部屋に切り替えました`);
+                }
             } catch (err) {
                 showToast('JSONの読み込みに失敗しました');
             }
