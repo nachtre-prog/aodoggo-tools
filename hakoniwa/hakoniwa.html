@@ -347,6 +347,31 @@
             cursor: pointer;
         }
 
+        /* 友人リストの行スタイル */
+        .friend-item-row {
+            display: grid;
+            grid-template-columns: 160px 1fr auto;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .friend-remove-btn {
+            background-color: var(--soft-bg);
+            border: 1px solid var(--border-color);
+            color: var(--sub-text);
+            border-radius: 6px;
+            padding: 6px 10px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.82rem;
+            transition: all 0.2s;
+        }
+
+        .friend-remove-btn:hover {
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+        }
+
         /* データ管理モーダル内のLLM接続ステータスバッジ */
         .llm-status-badge {
             display: inline-flex;
@@ -832,26 +857,44 @@
             text-decoration: underline;
         }
 
-        /* トースト通知 */
+        /* トースト通知（クリックで閉じる操作・エラー時の長時間表示に対応） */
         .toast {
             position: fixed;
             bottom: 22px;
             right: 22px;
+            max-width: min(440px, calc(100vw - 32px));
             background-color: var(--text-color);
             color: #ffffff;
-            padding: 9px 16px;
+            padding: 10px 16px;
             border-radius: 8px;
             font-size: 0.86rem;
+            line-height: 1.5;
             opacity: 0;
             transform: translateY(8px);
             pointer-events: none;
-            transition: opacity 0.25s, transform 0.25s;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+            transition: opacity 0.25s, transform 0.25s, background-color 0.2s;
             z-index: 200;
+        }
+
+        .toast.is-error {
+            background-color: #7a342c;
+            border: 1px solid #e0a89f;
         }
 
         .toast.show {
             opacity: 1;
             transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        .toast-close-hint {
+            display: block;
+            font-size: 0.72rem;
+            opacity: 0.8;
+            margin-top: 3px;
+            text-align: right;
         }
 
         @keyframes pulse-text {
@@ -880,6 +923,7 @@
             .dialogue-box { flex-direction: column; align-items: stretch; gap: 10px; max-height: none; }
             .inline-talk-btn { align-self: flex-end; }
             .form-grid-2, .form-grid-4 { grid-template-columns: 1fr; }
+            .friend-item-row { grid-template-columns: 1fr; }
             .modal-overlay { padding: 10px; }
             .modal-body { padding: 14px; }
         }
@@ -893,7 +937,7 @@
         <!-- 1. トップバー -->
         <div class="box top-bar">
             <div class="time-display">
-                <span id="uiDateDisplay">📅 1年目 春 3月1日 (日)</span>
+                <span id="uiDateDisplay">📅 1年目 春 3月1日 (日) ☀️ 晴れ</span>
                 <span class="time-clock" id="uiTimeDisplay">🕒 09:00</span>
             </div>
             <div class="time-controls">
@@ -1104,10 +1148,49 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- 世界観・環境設定（季節・天気のチェックボックス設定） -->
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; padding-top:6px; border-top:1px dashed var(--border-color);">
+                    <span id="uiWorldSummaryLabel" style="font-size:0.82rem; color:var(--sub-text);">🌍 世界観・気候：四季あり（春・夏・秋・冬） / 通常の天気</span>
+                    <button type="button" class="btn-secondary" id="btnToggleWorldBox" style="font-size:0.8rem; padding:5px 10px;">🌍 季節・天気の世界観設定を開く ▼</button>
+                </div>
+
+                <div class="bg-advanced-box" id="uiWorldAdvancedBox">
+                    <div class="preset-note">※チェックを入れた季節・天気だけが発生する世界になります。「ずっと春」「春と夏しかない」「ずっと雨」「雪と霧だけの世界」など、創作の世界観に合わせてカスタマイズできます。</div>
+                    <div class="form-group">
+                        <label>💡 世界観プリセット（ワンクリック適用）</label>
+                        <div class="meal-preset-row">
+                            <button type="button" class="meal-preset-btn" data-world-preset="standard">🌈 通常の四季・天気</button>
+                            <button type="button" class="meal-preset-btn" data-world-preset="eternal_spring">🌸 ずっと春・穏やかな晴天</button>
+                            <button type="button" class="meal-preset-btn" data-world-preset="summer_only">🌻 常夏（春・夏のみ）</button>
+                            <button type="button" class="meal-preset-btn" data-world-preset="eternal_rain">🌧️ ずっと雨の世界</button>
+                            <button type="button" class="meal-preset-btn" data-world-preset="winter_snow">❄️ 常冬・雪と霧の世界</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>🌸 存在する季節（最低1つ選択）</label>
+                        <div class="holiday-days-wrap" id="uiWorldSeasonsWrap">
+                            <label class="holiday-day-chip"><input type="checkbox" name="chkWorldSeason" value="春" checked><span>🌸 春</span></label>
+                            <label class="holiday-day-chip"><input type="checkbox" name="chkWorldSeason" value="夏" checked><span>🌻 夏</span></label>
+                            <label class="holiday-day-chip"><input type="checkbox" name="chkWorldSeason" value="秋" checked><span>🍁 秋</span></label>
+                            <label class="holiday-day-chip"><input type="checkbox" name="chkWorldSeason" value="冬" checked><span>❄️ 冬</span></label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>☀️ 発生する天気（最低1つ選択）</label>
+                        <div class="holiday-days-wrap" id="uiWorldWeathersWrap">
+                            <label class="holiday-day-chip"><input type="checkbox" name="chkWorldWeather" value="晴れ" checked><span>☀️ 晴れ</span></label>
+                            <label class="holiday-day-chip"><input type="checkbox" name="chkWorldWeather" value="曇り" checked><span>⛅ 曇り</span></label>
+                            <label class="holiday-day-chip"><input type="checkbox" name="chkWorldWeather" value="雨" checked><span>🌧️ 雨</span></label>
+                            <label class="holiday-day-chip"><input type="checkbox" name="chkWorldWeather" value="雪" checked><span>❄️ 雪</span></label>
+                            <label class="holiday-day-chip"><input type="checkbox" name="chkWorldWeather" value="霧"><span>🌫️ 霧</span></label>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="form-section">
-                <h4 class="form-section-title">性格・口調・好悪</h4>
+                <h4 class="form-section-title">性格・口調・好悪・交友関係</h4>
                 <div class="form-group">
                     <label for="inpSummary">キャラクター設定（概要・性格）</label>
                     <textarea id="inpSummary" rows="4" placeholder="真面目で読書好き。仕事になると少し熱中しやすい。"></textarea>
@@ -1145,6 +1228,20 @@
                     <div class="form-group">
                         <label for="inpDislikes">苦手なもの（カンマ区切り）</label>
                         <input type="text" id="inpDislikes" placeholder="騒音, 人混み">
+                    </div>
+                </div>
+
+                <!-- 友人・知人設定（折りたたみUI・＋ボタンで追加） -->
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; padding-top:6px; border-top:1px dashed var(--border-color);">
+                    <span id="uiFriendsSummaryLabel" style="font-size:0.82rem; color:var(--sub-text);">🤝 登録されている友人・知人：なし</span>
+                    <button type="button" class="btn-secondary" id="btnToggleFriendsBox" style="font-size:0.8rem; padding:5px 10px;">🤝 友人・知人の設定を開く ▼</button>
+                </div>
+
+                <div class="bg-advanced-box" id="uiFriendsAdvancedBox">
+                    <div class="preset-note">※友人や知人の「名前」と「関係・特徴」を追加しておくと、自由時間の様子や1日1ログの思い出、AI生成セリフにときどき登場するようになります（最大10人まで）。</div>
+                    <div id="uiFriendsListContainer" style="display:flex; flex-direction:column; gap:8px;"></div>
+                    <div>
+                        <button type="button" class="btn-secondary" id="btnAddFriendRow" style="font-size:0.82rem; padding:6px 12px;">＋ 友人・知人を追加する</button>
                     </div>
                 </div>
             </div>
@@ -1205,12 +1302,12 @@
 <div class="modal-overlay" id="modalMemories">
     <div class="modal-card">
         <div class="modal-header">
-            <h3 id="uiMemoriesModalTitle">📖 アルマの日々の思い出（1日1ログ）</h3>
+            <h3 id="uiMemoriesModalTitle">📖 日々の思い出（1日1ログ）</h3>
             <button type="button" class="close-btn" data-close="modalMemories">✕</button>
         </div>
         <div class="modal-body">
             <div class="form-section">
-                <h4 class="form-section-title" id="uiMemoriesSubTitle">アルマ自身の振り返り（1日につき1件記録されます）</h4>
+                <h4 class="form-section-title" id="uiMemoriesSubTitle">キャラクター自身の振り返り（1日につき1件記録されます）</h4>
                 <div class="log-list" id="uiMemoriesList" style="max-height: 52vh;"></div>
             </div>
         </div>
@@ -1220,23 +1317,23 @@
     </div>
 </div>
 
-<!-- モーダル2B：📝 観察日記（プレイヤー側のキャラクター別記録） -->
+<!-- モーダル2B：📝 観察日記（プレイヤー側の記録） -->
 <div class="modal-overlay" id="modalDiary">
     <div class="modal-card">
         <div class="modal-header">
-            <h3 id="uiDiaryModalTitle">📝 アルマの観察日記</h3>
+            <h3 id="uiDiaryModalTitle">📝 観察日記</h3>
             <button type="button" class="close-btn" data-close="modalDiary">✕</button>
         </div>
         <div class="modal-body">
             <div class="form-section">
-                <h4 class="form-section-title" id="uiDiaryWriteTitle">アルマの様子を観察者メモに記帳する</h4>
+                <h4 class="form-section-title" id="uiDiaryWriteTitle">観察者メモを記帳する</h4>
                 <div style="display:flex; gap:8px;">
-                    <input type="text" id="inpDiaryEntry" placeholder="アルマの今日見かけた様子や気づきを記録（Enterでも記帳）..." style="flex:1; padding:7px 10px; border:1px solid var(--border-color); border-radius:6px; font-family:inherit;">
+                    <input type="text" id="inpDiaryEntry" placeholder="今日見かけた様子やちょっとした気づきを記録（Enterでも記帳）..." style="flex:1; padding:7px 10px; border:1px solid var(--border-color); border-radius:6px; font-family:inherit;">
                     <button type="button" class="btn-primary" id="btnAddDiary">記帳する</button>
                 </div>
             </div>
             <div class="form-section">
-                <h4 class="form-section-title" id="uiDiaryHistoryTitle">これまでの観察日記（アルマ）</h4>
+                <h4 class="form-section-title" id="uiDiaryHistoryTitle">これまでの観察日記</h4>
                 <div class="log-list" id="uiDiaryList" style="max-height: 40vh;"></div>
             </div>
         </div>
@@ -1302,7 +1399,7 @@
                 <div class="form-group">
                     <label for="selLlmProvider">使用エンジン</label>
                     <select id="selLlmProvider">
-                        <option value="offline" selected>オフライン（LLMを呼ばず時間帯・状況に合わせて口調例文を選択）</option>
+                        <option value="offline">オフライン（LLMを呼ばず時間帯・状況に合わせて口調例文を選択）</option>
                         <option value="gemini">標準（Gemini API / Web環境）</option>
                         <option value="local_openai">ローカルLLM（OpenAI互換：LM Studio / Ollama 等）</option>
                     </select>
@@ -1323,7 +1420,7 @@
                     <div class="form-grid-2">
                         <div class="form-group">
                             <label for="inpGeminiApiKey">Gemini APIキー（マスク表示）</label>
-                            <input type="password" id="inpGeminiApiKey" autocomplete="off" placeholder="AIza...（取得したAPIキーを入力）">
+                            <input type="password" id="inpGeminiApiKey" autocomplete="off" placeholder="AIza...（未設定時はオフライン動作）">
                         </div>
                         <div class="form-group">
                             <label for="inpGeminiModel">Gemini モデル名</label>
@@ -1332,7 +1429,7 @@
                     </div>
                 </div>
                 <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-top:4px;">
-                    <span id="uiLlmTestResult" style="font-size:0.8rem; color:var(--sub-text);">初期状態はオフラインモードです。LLMを使う場合はエンジンを選択して保存してください。</span>
+                    <span id="uiLlmTestResult" style="font-size:0.8rem; color:var(--sub-text);">キャラクター設定の口調・性格を反映して1〜2文を生成します。</span>
                     <div style="display:flex; gap:8px;">
                         <button type="button" class="btn-secondary" id="btnTestLlm">現在の住人でセリフ生成テスト</button>
                         <button type="button" class="btn-primary" id="btnSaveLlmConfig">接続設定を保存</button>
@@ -1355,6 +1452,24 @@
                         <button type="button" class="btn-primary" id="btnImportOverwrite">既存の住人を上書き復元</button>
                         <button type="button" class="btn-secondary" id="btnImportAsNew">別の住人として追加</button>
                         <button type="button" class="btn-secondary" id="btnImportCancel">キャンセル</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4 class="form-section-title">📋 アップデート履歴</h4>
+                <div style="display:flex; flex-direction:column; gap:10px; font-size:0.82rem; color:var(--text-color); line-height:1.55;">
+                    <div style="background-color:var(--bg-color); border:1px solid var(--border-color); border-radius:8px; padding:10px 12px;">
+                        <div style="font-weight:bold; color:var(--accent-color); margin-bottom:4px;">2026/11/23 メジャーアップデート</div>
+                        <ul style="margin:0; padding-left:18px; display:flex; flex-direction:column; gap:4px;">
+                            <li><strong>独り言：</strong>もっと賢くなりました（好きなものの自動判別や時間帯・状況に応じた反応を強化）</li>
+                            <li><strong>天候：</strong>日々の天気が変わるようになりました。設定画面から季節や天気の出現ルールを詳細にカスタマイズできます</li>
+                            <li><strong>友人：</strong>話のレパートリーに設定した友人関係の人物が出てくることがあります。（ローカルLLM / API 利用推奨）友人の設定も簡易的に入力できます</li>
+                            <li><strong>隠し機能：</strong>「💬 話しかける」がこっそり強化されました。自由入力でしか引き出せない行動・発言を実装しました。（ローカルLLM / API 利用推奨）</li>
+                        </ul>
+                    </div>
+                    <div style="font-size:0.78rem; color:var(--sub-text); padding:0 4px;">
+                        ・2026/11/17 公開
                     </div>
                 </div>
             </div>
@@ -1397,9 +1512,92 @@ const STORAGE_KEY_ACTIVE = 'hakoniwa_oc_app_v1_active';
 const STORAGE_KEY_LLM = 'hakoniwa_oc_app_v1_llm_config';
 
 const DAYS_JP = ['日', '月', '火', '水', '木', '金', '土'];
+const SEASONS_ALL = ['春', '夏', '秋', '冬'];
+const WEATHERS_ALL = ['晴れ', '曇り', '雨', '雪', '霧'];
+const WEATHER_ICON_MAP = {
+    '晴れ': '☀️',
+    '曇り': '⛅',
+    '雨': '🌧️',
+    '雪': '❄️',
+    '霧': '🌫️'
+};
 const HABIT_DISPLAY_THRESHOLD = 5;
 const HABIT_WEIGHT_CAP = 20; 
 const LLM_TIMEOUT_MS = 60000; 
+const MAX_FRIENDS_COUNT = 10;
+
+const WORLD_PRESETS = {
+    standard: { seasons: ['春', '夏', '秋', '冬'], weathers: ['晴れ', '曇り', '雨', '雪'], label: '🌈 通常の四季・天気' },
+    eternal_spring: { seasons: ['春'], weathers: ['晴れ', '曇り'], label: '🌸 ずっと春・穏やかな晴天' },
+    summer_only: { seasons: ['春', '夏'], weathers: ['晴れ', '曇り', '雨'], label: '🌻 常夏（春・夏のみ）' },
+    eternal_rain: { seasons: ['春', '夏', '秋', '冬'], weathers: ['雨'], label: '🌧️ ずっと雨の世界' },
+    winter_snow: { seasons: ['冬'], weathers: ['曇り', '雪', '霧'], label: '❄️ 常冬・雪と霧の世界' }
+};
+
+/**
+ * 好きなもの（fav）を「飲食」「手に取る小物」「生き物」「眺める・空間・概念」「汎用」に自動分類し、
+ * 文脈に合った自然な日本語表現を返すヘルパー関数
+ * mode:
+ *  - 'with': 〜を片手に / 〜を手にとって / 〜に心を落ち着かせながら
+ *  - 'prepare': 〜を用意して / お気に入りの〜を取り出して / 〜を心地よく感じながら
+ *  - 'enjoy': 〜を楽しみながら / 〜を眺めながら / 〜に心を和ませながら
+ */
+function classifyFavoriteCategory(word) {
+    const w = String(word || '').trim();
+    if (!w) return 'default';
+
+    // 1. 行為・活動ワード（「お菓子作り」「読書」などが小物や飲食に誤分類されないよう最優先で汎用へ）
+    if (/(作り|づくり|料理|調理|読書|散歩|昼寝|睡眠|研究|観察|収集|採集|掃除|洗濯|運動|筋トレ|修行|訓練|練習|勉強|学習|仕事|作業|編み物|裁縫|刺繍|園芸|ガーデニング|釣り|狩り|冒険|旅|旅行|買い物|ショッピング|ゲーム|チェス|歌唱|演奏|ダンス|踊り|執筆|創作)$/.test(w)) {
+        return 'default';
+    }
+    // 2. 生き物・ペット・人間・人外（海の生き物や人外キャラの「人間」好き・逆の「人外」好き需要にも対応）
+    if (/(人間|にんげん|ニンゲン|人外|じんがい|ジンガイ|ヒト|ひと|人類|魔族|魔物|妖精|エルフ|悪魔|天使|竜|ドラゴン|精霊|幽霊|おばけ|妖怪|獣人|眷属|モンスター|猫|ネコ|ねこ|犬|イヌ|いぬ|鳥|インコ|文鳥|うさぎ|ウサギ|ハムスター|動物|ペット|使い魔|スライム|深海魚|熱帯魚|金魚|魚|さかな|サカナ|クラゲ|くらげ|海月|イルカ|クジラ|鯨|サメ|鮫|ペンギン|アザラシ|ラッコ|カワウソ|ウミウシ|ヒトデ|亀|カメ|トカゲ|カエル|虫|蝶)/.test(w)) {
+        return 'living';
+    }
+    // 3. 飲食・嗜好品（「朝のコーヒー」「月見だんご」「夜食」「海藻」などを空間より先に判定。「水晶」誤爆防止のため単漢字「水」は除外）
+    if (/^(水|お水|冷水|白湯|天然水|炭酸水|ミネラルウォーター|海苔|のり)$/.test(w) || /(お茶|紅茶|緑茶|中国茶|ハーブティー|茶葉|コーヒー|珈琲|カフェオレ|カフェラテ|ココア|ミルク|牛乳|豆乳|ジュース|ソーダ|サイダー|レモネード|お酒|ワイン|ビール|エール|カクテル|ウイスキー|日本酒|焼酎|お菓子|焼き菓子|和菓子|洋菓子|駄菓子|クッキー|ビスケット|スコーン|ケーキ|タルト|パイ|マカロン|マフィン|ドーナツ|チョコ|チョコレート|パフェ|プリン|ゼリー|アイス|アイスクリーム|キャンディ|飴|ガム|グミ|せんべい|団子|だんご|大福|饅頭|まんじゅう|羊羹|パン|サンドイッチ|トースト|ベーグル|ご飯|ごはん|白米|おにぎり|弁当|お弁当|夜食|朝食|昼食|夕食|軽食|おやつ|甘味|甘いもの|甘いおやつ|スープ|味噌汁|麺|パスタ|ラーメン|うどん|そば|ピザ|グラタン|カレー|シチュー|ステーキ|ハンバーグ|唐揚げ|天ぷら|寿司|刺身|海鮮|シーフード|海藻|海ぶどう|わかめ|昆布|こんぶ|魚介|肉料理|魚料理|野菜|サラダ|果物|フルーツ|りんご|林檎|苺|いちご|ぶどう|みかん|桃|バナナ|蜂蜜|はちみつ|ジャム)/.test(w)) {
+        return 'drink_food';
+    }
+    // 4. 手にとって使う・眺める小物・道具・収集品（「水晶」「光る石」などを空間より先に判定）
+    if (/(水晶|光る石|鉱石|原石|宝石|黒曜石|琥珀|結晶|魔導書|古書|専門書|参考書|本|小説|漫画|雑誌|辞書|図鑑|魔導具|ガラクタ|標本|ぬいぐるみ|人形|手紙|切手|コイン|古銭|ペン|万年筆|羽根ペン|文具|ノート|手帳|日記帳|道具|工具|実験器具|器具|楽器|ギター|ピアノ|バイオリン|オルゴール|笛|カメラ|時計|懐中時計|砂時計|眼鏡|アクセサリー|指輪|首飾り|ネックレス|イヤリング|ピアス|ブローチ|髪飾り|カード|タロット|パズル|スマホ|携帯電話|毛糸|布|武器|剣|短剣|ナイフ|銃|杖|ランタン|ランプ|キャンドル|蝋燭|雑貨|骨董|アンティーク|食器|ティーカップ|マグカップ)/.test(w)) {
+        return 'handheld';
+    }
+    // 5. 空間・眺めるもの・自然・環境・概念（「海」は単体一致または海辺・深海などの景色語に限定）
+    if (/(場所|部屋|空間|静か|静寂|星空|夜空|青空|夕空|朝焼け|夕焼け|夕暮れ|雲|月明かり|満月|三日月|太陽|夕日|朝日|日差し|陽射し|木漏れ日|雨音|雨上がり|雪景色|そよ風|夜風|潮風|嵐|天気|音楽|歌声|環境音|景色|風景|夜景|窓辺|窓|庭|庭園|花壇|花束|草花|植物|観葉植物|ドライフラワー|ハーブ|樹木|森林|森|海辺|深海|海岸|砂浜|水平線|夜の海|朝の海|夕暮れの海|夏の海|冬の海|青い海|海景色|海の音|波音|川辺|湖畔|山並み|自然|絵画|美術|芸術|写真|香り|匂い|アロマ|お香|香水|日向|日陰|暗がり|闇|孤独|一人|ひとり|平和|休日|自由時間|朝の空気|夜の空気|春|夏|秋|冬)/.test(w) || /^(空|海|月|星|雨|雪|風|花|木|光|影|朝|昼|夕|夕方|夜|深夜|音|歌)$/.test(w)) {
+        return 'scenery_space';
+    }
+    return 'default';
+}
+
+function formatFavoritePhrase(favWord, mode = 'with') {
+    const fav = String(favWord || 'お茶').trim() || 'お茶';
+    const cat = classifyFavoriteCategory(fav);
+
+    if (cat === 'drink_food') {
+        if (mode === 'prepare') return `${fav}を用意して`;
+        if (mode === 'enjoy') return `${fav}を味わいながら`;
+        return `${fav}を片手に`;
+    }
+    if (cat === 'handheld') {
+        if (mode === 'prepare') return `お気に入りの${fav}を取り出して`;
+        if (mode === 'enjoy') return `${fav}を手にとって眺めながら`;
+        return `${fav}を傍らに置いて`;
+    }
+    if (cat === 'living') {
+        if (mode === 'prepare') return `${fav}のそばに寄り添って`;
+        if (mode === 'enjoy') return `${fav}の様子を優しく見守りながら`;
+        return `${fav}を眺めながら`;
+    }
+    if (cat === 'scenery_space') {
+        if (mode === 'prepare') return `${fav}に心を落ち着かせて`;
+        if (mode === 'enjoy') return `${fav}を心地よく感じながら`;
+        return `${fav}に身を置きながら`;
+    }
+    // default（未知のワードでも違和感のない表現）
+    if (mode === 'prepare') return `お気に入りの${fav}に心を和ませて`;
+    if (mode === 'enjoy') return `${fav}に心を和ませながら`;
+    return `${fav}に心を和ませながら`;
+}
 
 const SPEECH_PRESETS = {
     polite: {
@@ -1664,6 +1862,11 @@ function createDefaultCharacterAlma() {
                 breakHour: 12,
                 dinner: true
             },
+            worldSettings: {
+                seasons: ['春', '夏', '秋', '冬'],
+                weathers: ['晴れ', '曇り', '雨', '雪']
+            },
+            friends: [],
             faceImageData: '',
             roomImageData: '',
             roomImages: { morning: '', evening: '', night: '' },
@@ -1672,6 +1875,7 @@ function createDefaultCharacterAlma() {
         state: {
             year: 1,
             season: '春',
+            weather: '晴れ',
             month: 3,
             day: 1,
             dayOfWeek: '日',
@@ -1730,6 +1934,11 @@ function createBlankCharacter(newId, defaultName = '新しい住人') {
                 breakHour: 12,
                 dinner: true
             },
+            worldSettings: {
+                seasons: ['春', '夏', '秋', '冬'],
+                weathers: ['晴れ', '曇り', '雨', '雪']
+            },
+            friends: [],
             faceImageData: '',
             roomImageData: '',
             roomImages: { morning: '', evening: '', night: '' },
@@ -1738,6 +1947,7 @@ function createBlankCharacter(newId, defaultName = '新しい住人') {
         state: {
             year: 1,
             season: '春',
+            weather: '晴れ',
             month: 3,
             day: 1,
             dayOfWeek: '日',
@@ -1769,7 +1979,18 @@ function createBlankCharacter(newId, defaultName = '新しい住人') {
 }
 
 /**
- * 観察日記内の初期自動記帳の文言部分だけを現在のキャラ名に部分置換で同期する（後半の文章やユーザー追記を消さない）
+ * 友人の表示名を取得する（オフライン時の地の文に長文の関係・セリフ設定が混入しないよう名前部分のみを取り出す）
+ */
+function getFriendDisplayName(friend) {
+    if (!friend || typeof friend.name !== 'string') return '';
+    const raw = friend.name.trim();
+    if (!raw) return '';
+    const stripped = raw.replace(/[（(][\s\S]*$/, '').trim();
+    return stripped || raw;
+}
+
+/**
+ * 観察日記内の初期自動記帳の文言部分だけを現在のキャラ名に部分置換で同期する（$記号を含む名前でも壊れないよう関数置換を使用）
  */
 function syncInitialObservationDiaryName(diaryArr, newName, prevName = '') {
     if (!Array.isArray(diaryArr) || !newName) return;
@@ -1780,22 +2001,22 @@ function syncInitialObservationDiaryName(diaryArr, newName, prevName = '') {
         let updated = entry.text;
 
         if (!/^新しい住人\d*$/.test(newName)) {
-            updated = updated.replace(/新しい住人\d*の暮らしの観察を始めた。/g, targetPhrase);
+            updated = updated.replace(/新しい住人\d*の暮らしの観察を始めた。/g, () => targetPhrase);
         }
         if (newName !== '名無しの住人') {
-            updated = updated.replace(/名無しの住人の暮らしの観察を始めた。/g, targetPhrase);
+            updated = updated.replace(/名無しの住人の暮らしの観察を始めた。/g, () => targetPhrase);
         }
         if (prevName && prevName !== newName) {
             if (prevName === 'アルマ') {
-                updated = updated.replace(/魔法学校の生徒・アルマの暮らしの観察を始めた。/g, targetPhrase);
-                updated = updated.replace(/結晶学者・アルマの暮らしの観察を始めた。/g, targetPhrase);
+                updated = updated.replace(/魔法学校の生徒・アルマの暮らしの観察を始めた。/g, () => targetPhrase);
+                updated = updated.replace(/結晶学者・アルマの暮らしの観察を始めた。/g, () => targetPhrase);
             }
             updated = updated.split(`${prevName}の暮らしの観察を始めた。`).join(targetPhrase);
         }
         if (newName !== 'アルマ') {
-            updated = updated.replace(/魔法学校の生徒・アルマの暮らしの観察を始めた。/g, targetPhrase);
-            updated = updated.replace(/結晶学者・アルマの暮らしの観察を始めた。/g, targetPhrase);
-            updated = updated.replace(/アルマの暮らしの観察を始めた。/g, targetPhrase);
+            updated = updated.replace(/魔法学校の生徒・アルマの暮らしの観察を始めた。/g, () => targetPhrase);
+            updated = updated.replace(/結晶学者・アルマの暮らしの観察を始めた。/g, () => targetPhrase);
+            updated = updated.replace(/アルマの暮らしの観察を始めた。/g, () => targetPhrase);
         }
 
         entry.text = updated;
@@ -1807,6 +2028,69 @@ function getSeasonByMonth(month) {
     if (month >= 6 && month <= 8) return '夏';
     if (month >= 9 && month <= 11) return '秋';
     return '冬';
+}
+
+/**
+ * 住人の世界観設定（許可された季節リスト）に基づいて現在の季節を決定する
+ */
+function resolveSeasonForWorld(month, worldSettings) {
+    const stdSeason = getSeasonByMonth(month);
+    const allowed = (worldSettings && Array.isArray(worldSettings.seasons))
+        ? worldSettings.seasons.filter(s => SEASONS_ALL.includes(s))
+        : SEASONS_ALL;
+    if (allowed.length === 0 || allowed.length === 4) return stdSeason;
+    if (allowed.length === 1) return allowed[0];
+    if (allowed.includes(stdSeason)) return stdSeason;
+
+    const quarterIdx = Math.floor(((month + 9) % 12) / 3);
+    return allowed[quarterIdx % allowed.length];
+}
+
+/**
+ * 住人の世界観設定（許可された天気リスト）と現在の季節に基づいて天気を抽選する
+ */
+function drawWeatherForWorld(season, worldSettings, currentWeather = null) {
+    const allowed = (worldSettings && Array.isArray(worldSettings.weathers))
+        ? worldSettings.weathers.filter(w => WEATHERS_ALL.includes(w))
+        : ['晴れ', '曇り', '雨', '雪'];
+    const list = allowed.length > 0 ? allowed : ['晴れ'];
+    if (list.length === 1) return list[0];
+
+    const allowedSeasons = (worldSettings && Array.isArray(worldSettings.seasons) && worldSettings.seasons.length > 0)
+        ? worldSettings.seasons
+        : SEASONS_ALL;
+
+    const baseWeightsBySeason = {
+        '春': { '晴れ': 50, '曇り': 26, '雨': 18, '霧': 6, '雪': 0 },
+        '夏': { '晴れ': 55, '曇り': 22, '雨': 19, '霧': 4, '雪': 0 },
+        '秋': { '晴れ': 48, '曇り': 27, '雨': 19, '霧': 6, '雪': 0 },
+        '冬': { '晴れ': 38, '曇り': 28, '雨': 10, '雪': 18, '霧': 6 }
+    };
+    const weightsMap = baseWeightsBySeason[season] || baseWeightsBySeason['春'];
+
+    const pool = list.map(w => {
+        let weight = weightsMap[w] ?? 10;
+        // 冬以外の季節でも、冬が存在しない世界観で雪がチェックされている場合や、雪・霧のみの構成では雪が降るようにする
+        if (w === '雪' && weight === 0) {
+            if (!allowedSeasons.includes('冬') || list.every(item => item === '雪' || item === '霧')) {
+                weight = 12;
+            }
+        }
+        if (currentWeather && w === currentWeather && weight > 0) {
+            weight = Math.round(weight * 1.35);
+        }
+        return { weather: w, weight };
+    }).filter(item => item.weight > 0);
+
+    if (pool.length === 0) return list[0];
+
+    const total = pool.reduce((sum, item) => sum + item.weight, 0);
+    let r = Math.random() * total;
+    for (const item of pool) {
+        if (r < item.weight) return item.weather;
+        r -= item.weight;
+    }
+    return pool[0].weather;
 }
 
 /**
@@ -1969,7 +2253,10 @@ function normalizeAndSanitizeCharacter(raw, fallbackId = '') {
                 sOff = 1;
                 start = (wake + sOff) % 24;
             }
-            if (eOff <= sOff || eOff >= awakeDur) {
+            if (eOff >= awakeDur) {
+                eOff = awakeDur - 1;
+                end = (wake + eOff) % 24;
+            } else if (eOff <= sOff) {
                 eOff = Math.min(awakeDur - 1, Math.max(sOff + 1, 9));
                 end = (wake + eOff) % 24;
             }
@@ -1997,6 +2284,28 @@ function normalizeAndSanitizeCharacter(raw, fallbackId = '') {
             ? rawProf.holidays.split(/[,、，\s]/).map(d => d.trim()).filter(d => DAYS_JP.includes(d))
             : ['日', '土']);
 
+    const rawWorld = (rawProf.worldSettings && typeof rawProf.worldSettings === 'object') ? rawProf.worldSettings : {};
+    const parsedSeasons = Array.isArray(rawWorld.seasons)
+        ? rawWorld.seasons.map(s => String(s ?? '').trim()).filter(s => SEASONS_ALL.includes(s))
+        : [];
+    const parsedWeathers = Array.isArray(rawWorld.weathers)
+        ? rawWorld.weathers.map(w => String(w ?? '').trim()).filter(w => WEATHERS_ALL.includes(w))
+        : [];
+    const worldSettings = {
+        seasons: parsedSeasons.length > 0 ? parsedSeasons : ['春', '夏', '秋', '冬'],
+        weathers: parsedWeathers.length > 0 ? parsedWeathers : ['晴れ', '曇り', '雨', '雪']
+    };
+
+    const friends = Array.isArray(rawProf.friends)
+        ? rawProf.friends
+            .filter(f => f && typeof f === 'object' && typeof f.name === 'string' && f.name.trim())
+            .map(f => ({
+                name: String(f.name).trim().slice(0, 40),
+                relation: typeof f.relation === 'string' ? f.relation.trim().slice(0, 100) : ''
+            }))
+            .slice(0, MAX_FRIENDS_COUNT)
+        : [];
+
     const profile = {
         id: baseId,
         name: baseName,
@@ -2019,6 +2328,8 @@ function normalizeAndSanitizeCharacter(raw, fallbackId = '') {
         schedule: { wake, start, end, sleep },
         holidays: holidays,
         mealSettings: { breakfast, breakHour, dinner },
+        worldSettings: worldSettings,
+        friends: friends,
         faceImageData: isSafeImageDataUrl(rawProf.faceImageData) ? rawProf.faceImageData.trim() : '',
         roomImageData: isSafeImageDataUrl(rawProf.roomImageData) ? rawProf.roomImageData.trim() : '',
         roomImages: {
@@ -2053,9 +2364,15 @@ function normalizeAndSanitizeCharacter(raw, fallbackId = '') {
         initialSpeech = initialSpeech.replace(/^（新しい住人\d*は/, `（${baseName}は`);
     }
 
+    const resolvedSeason = resolveSeasonForWorld(month, worldSettings);
+    const resolvedWeather = (typeof rawState.weather === 'string' && worldSettings.weathers.includes(rawState.weather))
+        ? rawState.weather
+        : drawWeatherForWorld(resolvedSeason, worldSettings);
+
     const state = {
         year,
-        season: getSeasonByMonth(month),
+        season: resolvedSeason,
+        weather: resolvedWeather,
         month,
         day,
         dayOfWeek,
@@ -2204,6 +2521,7 @@ function resolveDailyDinnerHour(sch, meal, hasScheduledWork) {
         if (h === null || h < 0 || h >= 24) return false;
         if (isHourSleeping(h, sch.wake, sch.sleep)) return false;
         if (sch.sleep !== null && h === sch.wake) return false;
+        if (sch.sleep === null && meal.breakfast && h === sch.wake) return false;
         if (standaloneBreakfastHour !== null && h === standaloneBreakfastHour) return false;
         if (meal.breakHour !== null && h === meal.breakHour) return false;
         if (hasScheduledWork && isHourInWorkRange(h, sch.start, sch.end)) return false;
@@ -2235,6 +2553,15 @@ function resolveDailyDinnerHour(sch, meal, hasScheduledWork) {
     if (sch.sleep !== null) {
         const sleepMod = sch.sleep % 24;
         fallbackCandidates.push((sleepMod - 2 + 24) % 24, (sleepMod - 1 + 24) % 24);
+    } else {
+        fallbackCandidates.push(
+            20,
+            21,
+            18,
+            (sch.wake + 12) % 24,
+            (sch.wake + 14) % 24,
+            (sch.wake + 10) % 24
+        );
     }
 
     for (const cand of fallbackCandidates) {
@@ -2277,6 +2604,42 @@ function formatMealSummaryText(meal) {
         return `🍽️ 現在の食生活：朝抜き（${String(meal.breakHour).padStart(2, '0')}:00休憩 / 夕食あり）`;
     }
     return `🍽️ 現在の食生活：${parts.join(' / ')}`;
+}
+
+function detectMatchingWorldPresetKey(world) {
+    if (!world) return 'standard';
+    const sArr = Array.isArray(world.seasons) ? world.seasons : SEASONS_ALL;
+    const wArr = Array.isArray(world.weathers) ? world.weathers : ['晴れ', '曇り', '雨', '雪'];
+
+    for (const [key, preset] of Object.entries(WORLD_PRESETS)) {
+        const sameSeasons = preset.seasons.length === sArr.length && preset.seasons.every(s => sArr.includes(s));
+        const sameWeathers = preset.weathers.length === wArr.length && preset.weathers.every(w => wArr.includes(w));
+        if (sameSeasons && sameWeathers) return key;
+    }
+    return '';
+}
+
+function formatWorldSummaryText(world) {
+    const sArr = (world && Array.isArray(world.seasons) && world.seasons.length > 0) ? world.seasons : SEASONS_ALL;
+    const wArr = (world && Array.isArray(world.weathers) && world.weathers.length > 0) ? world.weathers : ['晴れ', '曇り', '雨', '雪'];
+
+    const seasonText = sArr.length === 4
+        ? '四季あり'
+        : (sArr.length === 1 ? `ずっと${sArr[0]}` : `${sArr.join('・')}のみ`);
+    const weatherText = wArr.length === 1
+        ? `ずっと${wArr[0]}`
+        : wArr.join('・');
+    return `🌍 世界観・気候：${seasonText} / 天気：${weatherText}`;
+}
+
+function formatFriendsSummaryText(friends) {
+    if (!Array.isArray(friends) || friends.length === 0) {
+        return '🤝 登録されている友人・知人：なし';
+    }
+    const names = friends.map(f => f.name).filter(Boolean);
+    if (names.length === 0) return '🤝 登録されている友人・知人：なし';
+    const preview = names.slice(0, 3).join('、') + (names.length > 3 ? ` 他${names.length - 3}名` : '');
+    return `🤝 登録されている友人・知人：${names.length}名（${preview}）`;
 }
 
 function drawWeightedHobby(profile, habits, dayOfWeek) {
@@ -2357,9 +2720,9 @@ function buildObservationNoteText(habits, currentDayOfWeek) {
 }
 
 /**
- * オフライン・フォールバック時の時間帯・状況・季節キーワード反応
+ * オフライン・フォールバック時の時間帯・状況・季節・天気キーワード反応
  */
-function pickContextualSample(profile, state, contextType = 'monologue') {
+function pickContextualSample(profile, state, contextType = 'monologue', strictOnly = false) {
     const rawSamples = Array.isArray(profile.speechSamples) ? profile.speechSamples : [];
     const samples = rawSamples
         .map(s => String(s || '').replace(/^[「『"“”']+/, '').replace(/[」』"“”']+$/, '').trim())
@@ -2368,10 +2731,61 @@ function pickContextualSample(profile, state, contextType = 'monologue') {
 
     const hour = state.hour;
     const season = state.season || '春';
+    const weather = state.weather || '晴れ';
     const isMorning = (hour >= 5 && hour <= 10) || state.actionType === 'morning';
     const isDaytime = (hour >= 11 && hour <= 16);
     const isEvening = (hour >= 17 && hour <= 19) || state.actionType === 'return';
     const isNight = (hour >= 20 || hour <= 4);
+    const isLateNight = (hour >= 22 || hour <= 4);
+
+    if (contextType === 'talk_sleep') {
+        const sleepKeywords = ['眠', '寝', 'むにゃ', 'すや', 'あと5分', 'おやすみ', '夢', '布団', '毛布', 'ふわぁ'];
+        const matchedSleep = samples.filter(s => sleepKeywords.some(kw => s.includes(kw)));
+        if (matchedSleep.length > 0) {
+            return matchedSleep[Math.floor(Math.random() * matchedSleep.length)];
+        }
+        return '';
+    }
+
+    if (contextType === 'talk_request_pat') {
+        const directPatKeywords = ['撫', 'なで', 'よしよし', 'ぽん', 'ポン', '頭'];
+        const directMatched = samples.filter(s => directPatKeywords.some(kw => s.includes(kw)));
+        if (directMatched.length > 0) {
+            return directMatched[Math.floor(Math.random() * directMatched.length)];
+        }
+        const patReqKeywords = ['仕方ない', '世話が焼ける', '今回だけ', 'ほれ', '無理をするでない', '悪くねえ', 'ふふ', '嬉しい'];
+        const matched = samples.filter(s => patReqKeywords.some(kw => s.includes(kw)));
+        return matched.length > 0 ? matched[Math.floor(Math.random() * matched.length)] : '';
+    }
+
+    if (contextType === 'talk_give_pat') {
+        const directTouchKeywords = ['撫', 'なで', '触', 'さわ', 'めっ', 'くすぐ', 'よしよし', 'ぽん', 'ポン', '頭'];
+        const directMatched = samples.filter(s => directTouchKeywords.some(kw => s.includes(kw)));
+        if (directMatched.length > 0) {
+            return directMatched[Math.floor(Math.random() * directMatched.length)];
+        }
+        const patGiveKeywords = ['嬉しい', 'ふふ', 'えへへ', '別に', '構わない', '世話', '悪くねえ', 'ほっほ', '落ち着く'];
+        const matched = samples.filter(s => patGiveKeywords.some(kw => s.includes(kw)));
+        return matched.length > 0 ? matched[Math.floor(Math.random() * matched.length)] : '';
+    }
+
+    if (contextType === 'talk_meal_share') {
+        const shareKeywords = ['味見', 'どうぞ', 'ほらよ', 'いかが', 'スコーン', 'クッキー', 'お菓子', 'お茶', '紅茶', 'おいしい', '美味しい', '甘い'];
+        const matched = samples.filter(s => shareKeywords.some(kw => s.includes(kw)));
+        return matched.length > 0 ? matched[Math.floor(Math.random() * matched.length)] : '';
+    }
+
+    if (contextType === 'talk_meal_taste') {
+        const tasteKeywords = ['おいしい', '美味しい', '甘い', '味見', '食事', 'ご飯', 'ごはん', '飯', 'お菓子', 'クッキー', 'スコーン', 'お茶', '紅茶', '香り', '温かい', '糖分'];
+        const matched = samples.filter(s => tasteKeywords.some(kw => s.includes(kw)));
+        return matched.length > 0 ? matched[Math.floor(Math.random() * matched.length)] : '';
+    }
+
+    if (contextType === 'talk_care_gift') {
+        const careKeywords = ['ありがとう', 'ありがたい', '嬉しい', 'ほらよ', 'お茶', '紅茶', '休憩', '無理', '一息', '座る', '座り', '落ち着く', '悪くねえ'];
+        const matched = samples.filter(s => careKeywords.some(kw => s.includes(kw)));
+        return matched.length > 0 ? matched[Math.floor(Math.random() * matched.length)] : '';
+    }
 
     const seasonPriorityMap = {
         '春': ['春', '桜', '暖か', 'ぽかぽか', '新緑', '花'],
@@ -2380,40 +2794,66 @@ function pickContextualSample(profile, state, contextType = 'monologue') {
         '冬': ['冬', '寒', '雪', '冷え', '温か', 'あたたか', 'コタツ', 'ストーブ']
     };
     const seasonAvoidMap = {
-        '春': ['猛暑', '雪が', '凍え', '冬場'],
-        '夏': ['寒い', '雪が', '凍え', 'ストーブ', '冬場'],
-        '秋': ['猛暑', '雪が', '冬場'],
+        '春': ['猛暑', '凍え', '冬場'],
+        '夏': ['寒い', '凍え', 'ストーブ', '冬場'],
+        '秋': ['猛暑', '冬場'],
         '冬': ['暑い', '猛暑', '汗だく']
     };
 
+    const weatherPriorityMap = {
+        '晴れ': ['天気', '晴', '日差し', '青空', '散歩'],
+        '曇り': ['曇', '雲', '静か', '落ち着'],
+        '雨': ['雨', '傘', '湿', '静か', '部屋', '読書'],
+        '雪': ['雪', '白', '寒', '冷え', '温か', '紅茶', 'お茶'],
+        '霧': ['霧', '靄', '静か', '幻想']
+    };
+    const weatherAvoidMap = {
+        '晴れ': ['雨音', '土砂降り', '吹雪'],
+        '曇り': ['快晴', '青空', '土砂降り'],
+        '雨': ['いい天気', '良い天気', '快晴', '青空', '日差し', '散歩日和'],
+        '雪': ['いい天気', '良い天気', '快晴', '猛暑', '暑い'],
+        '霧': ['いい天気', '快晴', '青空']
+    };
+
     let priorityKeywords = [];
-    let avoidKeywords = [...(seasonAvoidMap[season] || [])];
+    let avoidKeywords = [
+        ...(seasonAvoidMap[season] || []),
+        ...(weatherAvoidMap[weather] || [])
+    ];
+    if (weather !== '雪' && season !== '冬') {
+        avoidKeywords.push('雪が');
+    }
 
     if (contextType === 'talk_busy' || state.actionType === 'work') {
         priorityKeywords = ['手が離せ', '忙し', '集中', '取り込', '仕事', '作業', '調合', '講義', '後ほど', '後で', '邪魔', '今ね'];
         avoidKeywords.push('おやすみ', 'もう寝', 'おはよ');
     } else if (contextType === 'talk_free') {
-        priorityKeywords = ['いらして', '来た', '来てくれ', '座る', '座り', 'お茶', '紅茶', 'お菓子', 'スコーン', 'クッキー', 'お話し', 'ようこそ', 'どうした', '用事', '君か'];
-        avoidKeywords.push('手が離せ', '話しかけんな', '話しかけないで', '邪魔しないで');
+        if (isLateNight) {
+            priorityKeywords = ['夜', 'こんな時間', 'まだ起きて', '静か', 'お茶', '紅茶', 'お菓子', '座る', '座り', '君か', 'いらして', '来た'];
+            avoidKeywords.push('手が離せ', '話しかけんな', '話しかけないで', '邪魔しないで', 'おはよ', '朝');
+        } else {
+            priorityKeywords = ['いらして', '来た', '来てくれ', '座る', '座り', 'お茶', '紅茶', 'お菓子', 'スコーン', 'クッキー', 'お話し', 'ようこそ', 'どうした', '用事', '君か'];
+            avoidKeywords.push('手が離せ', '話しかけんな', '話しかけないで', '邪魔しないで');
+        }
     } else if (state.actionType === 'meal') {
         priorityKeywords = ['食事', 'ご飯', 'ごはん', '飯', '朝ごはん', '朝食', '昼食', 'ランチ', 'お弁当', '夕食', '腹', '糖分', 'おいしい', '美味しい', '甘い', 'クッキー', 'スコーン', 'お菓子', 'お茶', '紅茶', 'お腹', '食べ', '味見', '休憩', '一息'];
         avoidKeywords.push('手が離せ', 'おやすみ', 'もう寝');
     } else if (isMorning) {
-        priorityKeywords = ['朝', 'おはよ', 'ごきげんよう', '天気', '起き', '眠い', '寝かせ', '今日も', ...(seasonPriorityMap[season] || [])];
+        priorityKeywords = ['朝', 'おはよ', 'ごきげんよう', '起き', '眠い', '寝かせ', '今日も', ...(seasonPriorityMap[season] || []), ...(weatherPriorityMap[weather] || [])];
         avoidKeywords.push('夜も更け', 'おやすみ', 'もう寝', '日も暮れ', 'ただいま', '帰');
     } else if (state.actionType === 'return') {
         priorityKeywords = ['ただいま', '戻', '疲れ', '休憩', '一息', 'お茶', '紅茶', '甘いもの', '終わ'];
         avoidKeywords.push('朝', 'おはよ');
     } else if (isNight) {
-        priorityKeywords = ['夜', 'もうこんな時間', '寝る', '眠る', 'おやすみ', '休む', '日も暮れ', '今日はここまで', '良い一日', 'また明日', '疲れ', ...(seasonPriorityMap[season] || [])];
+        priorityKeywords = ['夜', 'もうこんな時間', '寝る', '眠る', 'おやすみ', '休む', '日も暮れ', '今日はここまで', '良い一日', 'また明日', '疲れ', ...(seasonPriorityMap[season] || []), ...(weatherPriorityMap[weather] || [])];
         avoidKeywords.push('朝は', 'おはよ');
     } else if (isEvening) {
-        priorityKeywords = ['夕', '日も暮れ', 'ただいま', '疲れ', '休憩', 'お茶', '紅茶', 'お菓子', 'お腹'];
+        priorityKeywords = ['夕', '日も暮れ', 'ただいま', '疲れ', '休憩', 'お茶', '紅茶', 'お菓子', 'お腹', ...(weatherPriorityMap[weather] || [])];
         avoidKeywords.push('朝は', 'おはよ', 'おやすみ');
     } else if (isDaytime) {
         const hobby = state.currentHobby || '';
         const likes = Array.isArray(profile.likes) ? profile.likes : [];
-        priorityKeywords = [hobby, ...likes, ...(seasonPriorityMap[season] || []), 'ガラクタ', 'クッキー', '術式', '棚', '魔導', '静か', '天気', 'お茶', '紅茶', '読書', '研究', '面白', '楽しい', '順調', '休憩'].filter(Boolean);
+        priorityKeywords = [hobby, ...likes, ...(seasonPriorityMap[season] || []), ...(weatherPriorityMap[weather] || []), 'ガラクタ', 'クッキー', '術式', '棚', '魔導', '静か', 'お茶', '紅茶', '読書', '研究', '面白', '楽しい', '順調', '休憩'].filter(Boolean);
         avoidKeywords.push('朝は', 'おはよ', '夜も更け', 'おやすみ', 'もう寝', '日も暮れ');
     }
 
@@ -2427,22 +2867,107 @@ function pickContextualSample(profile, state, contextType = 'monologue') {
         }
     }
 
+    if (strictOnly) return '';
     return basePool[Math.floor(Math.random() * basePool.length)];
+}
+
+/**
+ * 自由入力テキストから隠しふれあい・食事・労いなどの意図を解析する
+ * - request_pat: 住人へのお願い（「頭を撫でて」「よしよしして」「褒めて」等）
+ * - give_pat: 観察者からのふれあい（「頭を撫でる」「なでなで」「ポンポン」等）
+ * - meal_share: おすそ分けのお願い（「一口ちょうだい」「分けて」「味見させて」等）
+ * - meal_taste: 食事・飲み物への質問や感想（「おいしい？」「おいしそう」「何食べてるの？」等）
+ * - care_gift: 温かい差し入れや労い（「お疲れ様」「ありがとう」「お茶を淹れる」等）
+ */
+function detectTalkIntent(message, actionType) {
+    const text = String(message || '').trim();
+    if (!text) return 'general';
+
+    // 1. 観察者が住人を撫でる・触れようとする明示的表現（「頭を撫でてあげる」「撫でてもいい？」「撫でさせて」等を最優先で判定）
+    if (/(頭を?|背中を?)?(なで|撫で|なでなで|撫で撫で|よしよし|ポンポン|ぽんぽん|頭を?ぽん|頭を?ポン)(て|って|して)?(あげる|あげよう|あげたい|もいい|てもいい|させて|させてもら|しにき|しに来|ようか|てやる)/.test(text)) {
+        return 'give_pat';
+    }
+
+    // 2. 住人に撫でてほしい・労ってほしいとお願いする表現（「頭を撫でて」「なでなでして」「よしよしして」等）
+    if (/(頭を?|背中を?)?(なでて|撫でて|なでなでして|撫で撫でして|よしよしして|ぽんぽんして|ポンポンして|褒めて|ほめて|ねぎらって|労って)(ほしい|欲しい|くれ|ください|下さい|よ|ね|ちょうだい|頂戴|[！!？?。〜~…]*$)/.test(text)) {
+        return 'request_pat';
+    }
+
+    // 3. 観察者が住人を撫でる行動描写・名詞的表現（「（頭を撫でる）」「頭を撫でる」「なでなで」等）
+    if (/(頭を?なでる|頭を?撫でる|頭なでる|頭撫でる|なでなで|撫で撫で|撫でる|なでる|よしよし|ポンポン|ぽんぽん|頭を?ぽん|頭を?ポン|背中を?なで|背中を?撫で)/.test(text)) {
+        return 'give_pat';
+    }
+
+    // 4. 食事のおすそ分け（「分けて」「ちょうだい」は食事中または飲食・おすそ分けワードを伴う場合のみに限定）
+    if (
+        /(一口|ひとくち|１口|1口|あーん|あ〜ん|味見させて|食べさせて|少しください|少しくれ|おすそわけ|おすそ分け)/.test(text) ||
+        ((actionType === 'meal' || /(一口|ひとくち|少し|ちょっと|半分|それ|お菓子|ごはん|ご飯|パン|ケーキ|クッキー|食べ|飲)/.test(text)) && /(わけて|分けて|ちょうだい|頂戴)/.test(text))
+    ) {
+        return 'meal_share';
+    }
+
+    // 5. 差し入れ・労い（「どうぞ」単体の誤爆を防ぐため飲食・差し入れ文脈に限定）
+    if (/(差し入れ|お土産|おみやげ|召し上が|めしあが|お茶を?淹れ|紅茶を?淹れ|コーヒーを?淹れ|お菓子を?渡|お菓子を?置|食べ[て]?どうぞ|飲[んで]?どうぞ|どうぞ[、,！!。\s]*(食べ|飲|召し|受け取))/.test(text)) {
+        return 'care_gift';
+    }
+
+    // 6. 食事の感想・質問（食事中以外の「おいしいお店」「うまい話」等の誤爆を防止）
+    if (/(おいしい|美味しい|おいしそう|美味しそう|うまい|美味い|うまそう|美味そう|何食べ|なに食べ|何を食べ|なにを食べ|何飲ん|なに飲ん|味はどう|どんな味|ごはんどう|ご飯どう|食事どう|メニュー|献立|お腹すいた|おなかすいた)/.test(text)) {
+        if (actionType === 'meal' || !/(お店|店|話|方法|やり方|絵|歌|字|演技)/.test(text)) {
+            return 'meal_taste';
+        }
+    }
+
+    if (/(お疲れ|おつかれ|ありがとう|えらい|偉い|頑張ってる|がんばってる|無理せず|無理しない|ゆっくりして|応援して)/.test(text)) {
+        return 'care_gift';
+    }
+
+    return 'general';
 }
 
 function generateContextualMonologue(profile, state) {
     const name = profile.name || '住人';
-    const likes = (profile.likes && profile.likes.length > 0) ? profile.likes : ['飲み物'];
+    const likes = (profile.likes && profile.likes.length > 0) ? profile.likes : ['お茶'];
     const fav = likes[Math.floor(Math.random() * likes.length)];
     const workplace = profile.workplace || profile.job || '予定先';
     const season = state.season || '春';
-    const seasonAtmosphereMap = {
-        '春': 'やわらかな春の空気の中、',
-        '夏': '季節の陽気を感じながら、',
-        '秋': '落ち着いた秋の気配の中、',
-        '冬': '静かな冬の空気の中、部屋を暖かくして'
+    const weather = state.weather || '晴れ';
+
+    const weatherAtmosphereMap = {
+        '晴れ': {
+            '春': 'やわらかな春の陽射しの中、',
+            '夏': '明るい夏の陽気を感じながら、',
+            '秋': '澄んだ秋の空気の中、',
+            '冬': '穏やかな冬晴れの光の中、部屋を暖かくして'
+        },
+        '曇り': {
+            '春': '落ち着いた春の曇り空の下、',
+            '夏': '少し日差しが和らいだ曇り空の下、',
+            '秋': '静かな秋の曇り空を窓の外に眺めながら、',
+            '冬': 'ひんやりとした冬の曇り空の下、暖かい部屋で'
+        },
+        '雨': {
+            '春': '窓を濡らす春雨の音を聞きながら、',
+            '夏': '窓の外の雨音に耳を傾けながら、',
+            '秋': 'しとしとと降る秋雨の音を聞きながら、',
+            '冬': '冷たい雨の降る窓辺から離れ、暖かい部屋で'
+        },
+        '雪': {
+            '春': '季節外れの舞い散る雪を窓越しに眺めながら、',
+            '夏': '不思議な雪景色を窓の外に眺めながら、',
+            '秋': '静かに舞い落ちる雪を窓越しに眺めながら、',
+            '冬': '窓の外にしんしんと降る雪を眺めながら、暖かい部屋で'
+        },
+        '霧': {
+            '春': '幻想的な霧に包まれた外の景色を眺めながら、',
+            '夏': '白い霧が立ち込める静かな空気の中、',
+            '秋': '深い霧に包まれた静寂の中、',
+            '冬': '白く霞む霧の景色を窓越しに眺めながら、'
+        }
     };
-    const seasonAtmosphere = seasonAtmosphereMap[season] || '';
+    const seasonAtmosphere = (weatherAtmosphereMap[weather] && weatherAtmosphereMap[weather][season])
+        ? weatherAtmosphereMap[weather][season]
+        : '穏やかな空気の中、';
 
     if (state.actionType === 'sleep') {
         const lines = [
@@ -2454,20 +2979,23 @@ function generateContextualMonologue(profile, state) {
     }
 
     const sample = pickContextualSample(profile, state, 'monologue');
+    const favPrepare = formatFavoritePhrase(fav, 'prepare');
+    const favWith = formatFavoritePhrase(fav, 'with');
+    const favEnjoy = formatFavoritePhrase(fav, 'enjoy');
 
     if (state.actionType === 'morning') {
-        const timeWord = (state.hour >= 5 && state.hour <= 10) ? `${season}の朝の光の中、` : '目を覚まして、';
+        const timeWord = (state.hour >= 5 && state.hour <= 10) ? `${season}の朝の空気の中、` : '目を覚まして、';
         if (sample) {
-            return `「${sample}」\n（${timeWord}身支度を整えながら${fav}を用意しているようだ）`;
+            return `「${sample}」\n（${timeWord}${favPrepare}身支度を整えているようだ）`;
         }
         return `（${timeWord}${name}は身支度を整えているようだ）`;
     }
 
     if (state.actionType === 'meal') {
         if (sample) {
-            return `「${sample}」\n（${fav}などを楽しみながら、${state.currentAction}ようだ）`;
+            return `「${sample}」\n（${favEnjoy}、${state.currentAction}ようだ）`;
         }
-        return `（${name}は${fav}を用意して、${state.currentAction}ようだ）`;
+        return `（${name}は${favPrepare}、${state.currentAction}ようだ）`;
     }
 
     if (state.actionType === 'work') {
@@ -2479,17 +3007,28 @@ function generateContextualMonologue(profile, state) {
 
     if (state.actionType === 'return') {
         if (sample) {
-            return `「${sample}」\n（今日の予定を終えて帰宅し、${fav}で一息ついている）`;
+            return `「${sample}」\n（今日の予定を終えて帰宅し、${favPrepare}一息ついている）`;
         }
-        return `（今日の予定を終えて部屋に戻り、${fav}を用意してほっと一息ついているようだ）`;
+        return `（今日の予定を終えて部屋に戻り、${favPrepare}ほっと一息ついているようだ）`;
     }
 
     if (state.actionType === 'hobby') {
         const hobby = state.currentHobby || '休息';
-        if (sample) {
-            return `「${sample}」\n（${seasonAtmosphere}${fav}を片手に、${hobby}をして穏やかな時間を過ごしている）`;
+        const friends = Array.isArray(profile.friends) ? profile.friends.filter(f => f && getFriendDisplayName(f)) : [];
+        const useFriendEpisode = friends.length > 0 && Math.random() < 0.2;
+        if (useFriendEpisode) {
+            const friend = friends[Math.floor(Math.random() * friends.length)];
+            const friendName = getFriendDisplayName(friend);
+            if (sample) {
+                return `「${sample}」\n（${seasonAtmosphere}${friendName}のことをふと思い浮かべつつ、${hobby}をして過ごしている）`;
+            }
+            return `（${seasonAtmosphere}${name}は${friendName}との出来事を思い出しながら、${hobby}をして穏やかに過ごしているようだ）`;
         }
-        return `（${seasonAtmosphere}${name}は${fav}を楽しみながら、${hobby}をして静かに過ごしているようだ）`;
+
+        if (sample) {
+            return `「${sample}」\n（${seasonAtmosphere}${favWith}、${hobby}をして穏やかな時間を過ごしている）`;
+        }
+        return `（${seasonAtmosphere}${name}は${favEnjoy}、${hobby}をして静かに過ごしているようだ）`;
     }
 
     return sample ? `「${sample}」` : `（${name}は穏やかに過ごしている）`;
@@ -2508,12 +3047,13 @@ function maybeCreateThoughtEvent(profile, state) {
         const h1 = hobbies[0];
         const h2 = hobbies[1] || '休息';
         const l1 = likes[0];
+        const l1Prepare = formatFavoritePhrase(l1, 'prepare');
 
         state.pendingThought = {
-            prompt: `（${name}は少し考え事をしているようだ。このまま『${h1}』を続けるか、それとも『${l1}』を用意して『${h2}』にするか迷っているように見える）`,
+            prompt: `（${name}は少し考え事をしているようだ。このまま『${h1}』を続けるか、それとも${l1Prepare}『${h2}』にするか迷っているように見える）`,
             options: [
                 { label: `${h1}をじっくり続けるのが良さそう`, hobby: h1, reply: `（こちらの助言に頷き、もう少し『${h1}』を続けることにしたようだ）` },
-                { label: `${l1}で一息ついて${h2}にするのはどう？`, hobby: h2, reply: `（気分転換に『${l1}』を用意して、『${h2}』に切り替えることにしたようだ）` }
+                { label: `${l1}とともに${h2}にするのはどう？`, hobby: h2, reply: `（気分転換に${l1Prepare}、『${h2}』に切り替えることにしたようだ）` }
             ]
         };
     }
@@ -2653,12 +3193,25 @@ function applyScheduleForCurrentHour(charObj, isHourlyStep = false) {
 
         const likes = (profile.likes && profile.likes.length > 0) ? profile.likes : ['お茶'];
         const fav = likes[Math.floor(Math.random() * likes.length)];
+        const favEnjoy = formatFavoritePhrase(fav, 'enjoy');
         const timeLabel = isHoliday ? '休日の自由な時間に' : '空いた時間に';
-        upsertDailyMemory(
-            charObj,
-            `${timeLabel}、${fav}を楽しみながら${chosenHobby}をして静かに過ごした。`,
-            false
-        );
+        const friends = Array.isArray(profile.friends) ? profile.friends.filter(f => f && getFriendDisplayName(f)) : [];
+
+        if (friends.length > 0 && Math.random() < 0.22) {
+            const friend = friends[Math.floor(Math.random() * friends.length)];
+            const friendName = getFriendDisplayName(friend);
+            upsertDailyMemory(
+                charObj,
+                `${timeLabel}、${friendName}のことを思い浮かべつつ${chosenHobby}をして静かに過ごした。`,
+                false
+            );
+        } else {
+            upsertDailyMemory(
+                charObj,
+                `${timeLabel}、${favEnjoy}${chosenHobby}をして静かに過ごした。`,
+                false
+            );
+        }
     } else {
         state.actionType = 'hobby';
         state.hobbyBlockHours = nextBlockHours;
@@ -2685,8 +3238,12 @@ function advanceOneHourStep(charObj) {
                 state.month = 1;
                 state.year += 1;
             }
-            state.season = getSeasonByMonth(state.month);
         }
+        state.season = resolveSeasonForWorld(state.month, profile.worldSettings);
+        state.weather = drawWeatherForWorld(state.season, profile.worldSettings, state.weather);
+    } else if (state.hour % 6 === 0) {
+        state.season = resolveSeasonForWorld(state.month, profile.worldSettings);
+        state.weather = drawWeatherForWorld(state.season, profile.worldSettings, state.weather);
     }
 
     applyScheduleForCurrentHour(charObj, true);
@@ -2699,7 +3256,9 @@ function advanceOneHourStep(charObj) {
 
 function formatStateDateTime(state) {
     const hh = String(state.hour).padStart(2, '0');
-    return `${state.year}年目 ${state.season} ${state.month}月${state.day}日 (${state.dayOfWeek}) ${hh}:00`;
+    const w = state.weather || '晴れ';
+    const wIcon = WEATHER_ICON_MAP[w] || '☀️';
+    return `${state.year}年目 ${state.season} ${state.month}月${state.day}日 (${state.dayOfWeek}) ${wIcon}${w} ${hh}:00`;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -2709,6 +3268,15 @@ document.addEventListener('DOMContentLoaded', () => {
     let deleteConfirmStep = false;
     let resetConfirmStep = false;
     let hasNotifiedGeminiAuthIssue = false;
+    let lastLlmErrorToastTime = 0;
+
+    function notifyLlmErrorOncePerCooldown(message, forceToast = false) {
+        const now = Date.now();
+        if (forceToast || now - lastLlmErrorToastTime > 6000) {
+            lastLlmErrorToastTime = now;
+            showToast(message);
+        }
+    }
 
     function resetDeleteButtonState() {
         deleteConfirmStep = false;
@@ -2806,15 +3374,43 @@ document.addEventListener('DOMContentLoaded', () => {
         return charactersMap[activeCharId];
     }
 
-    function showToast(message) {
+    function hideToast() {
         const el = document.getElementById('uiToast');
-        el.textContent = message;
+        if (!el) return;
+        clearTimeout(el._timer);
+        el.classList.remove('show');
+    }
+
+    function showToast(message, options = {}) {
+        const el = document.getElementById('uiToast');
+        if (!el) return;
+        const text = String(message || '');
+        const isError = Boolean(options.isError) || text.includes('⚠️') || text.includes('失敗') || text.includes('上限に達したため保存できません');
+        const duration = options.duration || (isError ? 11000 : 3200);
+
+        el.textContent = '';
+        const mainSpan = document.createElement('span');
+        mainSpan.textContent = text;
+        el.appendChild(mainSpan);
+
+        if (isError) {
+            el.classList.add('is-error');
+            const hintSpan = document.createElement('span');
+            hintSpan.className = 'toast-close-hint';
+            hintSpan.textContent = '（クリック／タップで閉じる）';
+            el.appendChild(hintSpan);
+        } else {
+            el.classList.remove('is-error');
+        }
+
         el.classList.add('show');
         clearTimeout(el._timer);
         el._timer = setTimeout(() => {
             el.classList.remove('show');
-        }, 2800);
+        }, duration);
     }
+
+    document.getElementById('uiToast').addEventListener('click', hideToast);
 
     function escapeHtml(str) {
         return String(str)
@@ -2907,7 +3503,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const period = getTimePeriodByHour(state.hour);
         const periodIconMap = { morning: '🌅', day: '☀️', evening: '🌇', night: '🌙' };
         const periodIcon = periodIconMap[period] || '🕒';
-        document.getElementById('uiDateDisplay').textContent = `📅 ${state.year}年目 ${state.season} ${state.month}月${state.day}日 (${state.dayOfWeek})`;
+        const weatherName = state.weather || '晴れ';
+        const weatherIcon = WEATHER_ICON_MAP[weatherName] || '☀️';
+        document.getElementById('uiDateDisplay').textContent = `📅 ${state.year}年目 ${state.season} ${state.month}月${state.day}日 (${state.dayOfWeek}) ${weatherIcon} ${weatherName}`;
         document.getElementById('uiTimeDisplay').textContent = `${periodIcon} ${hh}:00`;
 
         const roomArea = document.getElementById('uiRoomArea');
@@ -3156,9 +3754,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (isAuthOrKeyError(response.status, firstErrBody)) {
                     if (!hasNotifiedGeminiAuthIssue) {
                         hasNotifiedGeminiAuthIssue = true;
-                        showToast('Gemini APIキーが未設定または無効なため、例文ベースのセリフで表示します（💾データ管理から設定可能）');
+                        showToast('⚠️ Gemini APIキーが未設定または無効なため、例文ベースのセリフで表示します（💾データ管理から設定可能）');
                     }
-                    return null;
+                    return { text: null, errorReason: 'auth_error', errorMessage: '⚠️ APIキーが未入力または無効です。『💾 データ管理』からキーを確認してください。' };
+                }
+
+                if (response.status === 429) {
+                    const msg429 = '⚠️ Gemini APIの利用制限（回数上限・レートリミット）に達しました。しばらく時間を置くか、オフラインモードでお楽しみください';
+                    notifyLlmErrorOncePerCooldown(msg429);
+                    return { text: null, errorReason: 'rate_limit', errorMessage: msg429 };
+                }
+
+                if (response.status === 404) {
+                    const msg404 = `⚠️ 指定されたGeminiモデル名（${modelName}）が見つかりません。『💾 データ管理』のモデル名をご確認ください`;
+                    notifyLlmErrorOncePerCooldown(msg404);
+                    return { text: null, errorReason: 'model_not_found', errorMessage: msg404 };
                 }
 
                 if (response.status === 400) {
@@ -3175,12 +3785,23 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (isAuthOrKeyError(response.status, secondErrBody) || (!apiKey && response.status === 400)) {
                         if (!hasNotifiedGeminiAuthIssue) {
                             hasNotifiedGeminiAuthIssue = true;
-                            showToast('Gemini APIキーが未設定または無効なため、例文ベースのセリフで表示します（💾データ管理から設定可能）');
+                            showToast('⚠️ Gemini APIキーが未設定または無効なため、例文ベースのセリフで表示します（💾データ管理から設定可能）');
                         }
-                    } else {
-                        console.warn("Gemini API status:", response.status);
+                        return { text: null, errorReason: 'auth_error', errorMessage: '⚠️ APIキーが未入力または無効です。『💾 データ管理』からキーを確認してください。' };
                     }
-                    return null;
+                    if (response.status === 429) {
+                        const msg429 = '⚠️ Gemini APIの利用制限（回数上限・レートリミット）に達しました。しばらく時間を置くか、オフラインモードでお楽しみください';
+                        notifyLlmErrorOncePerCooldown(msg429);
+                        return { text: null, errorReason: 'rate_limit', errorMessage: msg429 };
+                    }
+                    if (response.status >= 500) {
+                        const msg500 = `⚠️ AIサーバー側が一時的に混雑・エラー（HTTP ${response.status}）となっています。自動で例文セリフに切り替えます`;
+                        notifyLlmErrorOncePerCooldown(msg500);
+                        return { text: null, errorReason: 'server_error', errorMessage: msg500 };
+                    }
+                    const msgOther = `⚠️ Gemini APIエラー（HTTP ${response.status}）が発生したため、例文セリフで表示します`;
+                    notifyLlmErrorOncePerCooldown(msgOther);
+                    return { text: null, errorReason: 'http_error', errorMessage: msgOther };
                 }
             }
 
@@ -3194,13 +3815,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     .join('')
                     .trim();
                 const fallbackText = parts.map(p => p.text || '').join('').trim();
-                return sanitizeLlmSpeech(mainText || fallbackText);
+                const cleaned = sanitizeLlmSpeech(mainText || fallbackText);
+                return { text: cleaned, errorReason: cleaned ? null : 'empty_response', errorMessage: cleaned ? '' : '⚠️ AIからの応答が空だったため、例文セリフを維持しました' };
             }
-            return null;
+            return { text: null, errorReason: 'empty_response', errorMessage: '⚠️ AIからの応答が取得できなかったため、例文セリフを維持しました' };
         } catch (e) {
-            if (e && e.name === 'AbortError') return null;
-            console.error("Gemini通信エラーまたはタイムアウト:", e);
-            return null;
+            if (e && e.name === 'AbortError') {
+                return { text: null, errorReason: 'aborted', errorMessage: '⚠️ AI通信が中断またはタイムアウトしました' };
+            }
+            const msgNet = '⚠️ Gemini APIへの通信に失敗しました。ネットワーク接続をご確認ください';
+            notifyLlmErrorOncePerCooldown(msgNet);
+            return { text: null, errorReason: 'network_error', errorMessage: msgNet };
         }
     }
 
@@ -3228,25 +3853,40 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify(payload)
             }, abortController);
             if (!response.ok) {
-                console.warn("Local LLM HTTP status:", response.status);
-                return null;
+                if (response.status === 404) {
+                    const msg404 = `⚠️ ローカルLLMのモデルまたはURLが見つかりません（HTTP 404）。モデル名やエンドポイントURLをご確認ください`;
+                    notifyLlmErrorOncePerCooldown(msg404);
+                    return { text: null, errorReason: 'model_not_found', errorMessage: msg404 };
+                }
+                if (response.status === 429) {
+                    const msg429 = '⚠️ ローカルLLM側のリクエスト制限（HTTP 429）に達しました。少し待ってから再度お試しください';
+                    notifyLlmErrorOncePerCooldown(msg429);
+                    return { text: null, errorReason: 'rate_limit', errorMessage: msg429 };
+                }
+                const msgHttp = `⚠️ ローカルLLMエラー（HTTP ${response.status}）。サーバーの状態やモデル設定をご確認ください`;
+                notifyLlmErrorOncePerCooldown(msgHttp);
+                return { text: null, errorReason: 'http_error', errorMessage: msgHttp };
             }
             const result = await response.json();
             const content = result.choices?.[0]?.message?.content;
             if (content) {
-                return sanitizeLlmSpeech(content);
+                const cleaned = sanitizeLlmSpeech(content);
+                return { text: cleaned, errorReason: cleaned ? null : 'empty_response', errorMessage: cleaned ? '' : '⚠️ ローカルLLMの応答が空でした' };
             }
-            return null;
+            return { text: null, errorReason: 'empty_response', errorMessage: '⚠️ ローカルLLMの応答が空でした' };
         } catch (e) {
-            if (e && e.name === 'AbortError') return null;
-            console.error("ローカルLLM通信エラーまたはタイムアウト:", e);
-            return null;
+            if (e && e.name === 'AbortError') {
+                return { text: null, errorReason: 'aborted', errorMessage: '⚠️ ローカルLLMの応答がタイムアウトまたは中断されました' };
+            }
+            const msgLocal = '⚠️ ローカルLLMに接続できません。LM Studio等のサーバー起動と『Enable CORS』の設定をご確認ください';
+            notifyLlmErrorOncePerCooldown(msgLocal);
+            return { text: null, errorReason: 'network_error', errorMessage: msgLocal };
         }
     }
 
     async function requestLlmGeneration(systemInstruction, userQuery, abortController) {
         if (llmConfig.provider === 'offline') {
-            return null;
+            return { text: null, errorReason: 'offline', errorMessage: '' };
         }
         if (llmConfig.provider === 'local_openai') {
             return await callLocalOpenAIAPI(systemInstruction, userQuery, abortController);
@@ -3259,7 +3899,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (llmConfig.provider === 'offline') return { ok: false, reason: 'offline' };
 
         const { profile, state, memories } = charObj;
-        if (!isTest && state.actionType === 'sleep') {
+        if (!isTest && state.actionType === 'sleep' && type !== 'talk_sleep') {
             return { ok: false, reason: 'sleeping' };
         }
 
@@ -3290,6 +3930,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? `\n【発話の例文（以下の例文の一人称・語尾・句読点・リズムを徹底的に模倣すること）】\n` + sampleList.map(s => `- 「${s.replace(/^[「『"“”']+|[」』"“”']+$/g, '')}」`).join('\n')
                 : '';
 
+            const friendsList = Array.isArray(profile.friends) ? profile.friends.filter(f => f && f.name) : [];
+            const friendsLine = friendsList.length > 0
+                ? `\n- 友人・知人: ${friendsList.map(f => f.relation ? `${f.name}（${f.relation}）` : f.name).join('、')}`
+                : '';
+
             const sysPrompt = `あなたは箱庭の中で暮らしている以下のキャラクター本人です。設定された性格・思考傾向・口調・例文の話し方を完璧に保って、自然な日本語のみで発言してください。
 
 【キャラクタープロフィール】
@@ -3297,7 +3942,7 @@ document.addEventListener('DOMContentLoaded', () => {
 - 職業・立場: ${[profile.job, profile.workplace, profile.affiliation].filter(Boolean).join(' / ') || profile.lifeStyle}
 - 性格・人物像: ${profile.summary || '穏やかに日々を暮らしている。'}
 - 好きなもの: ${(profile.likes && profile.likes.length > 0) ? profile.likes.join('、') : '特になし'}
-- 苦手なもの: ${(profile.dislikes && profile.dislikes.length > 0) ? profile.dislikes.join('、') : '特になし'}
+- 苦手なもの: ${(profile.dislikes && profile.dislikes.length > 0) ? profile.dislikes.join('、') : '特になし'}${friendsLine}
 
 【最重要：口調・一人称・文末語尾の指定】
 ${profile.tone || '一人称は「私」。自然で落ち着いた口調で話す。'}${samplesBlock}
@@ -3315,23 +3960,56 @@ ${profile.tone || '一人称は「私」。自然で落ち着いた口調で話�
    - 英語（英単語・アルファベット文）、中国語（簡体字・繁体字特有の文字や中国語文法）、韓国語（ハングル）、ロシア語など、日本語以外の言語や文字の混入は固く禁じます。`;
 
             const recentMemories = (memories || []).slice(0, 2).map(m => m.text).join(' / ');
+            const weatherName = state.weather || '晴れ';
+            const isLateNight = (state.hour >= 22 || state.hour <= 4);
+            const talkIntent = options.talkIntent || 'general';
 
             let userPrompt = `【現在の状況】
-- 日時・季節: ${state.year}年目 ${state.season}（${state.month}月${state.day}日・${state.dayOfWeek}曜日） ${state.hour}:00
+- 日時・季節・天気: ${state.year}年目 ${state.season}（${state.month}月${state.day}日・${state.dayOfWeek}曜日） ${state.hour}:00 / 天気：${weatherName}
 - 現在の行動: ${simulatedAction}
 - 最近の出来事: ${recentMemories || '普段通りの日常'}\n\n`;
 
-            if (type === 'talk') {
-                if (state.actionType === 'work' || state.actionType === 'morning') {
-                    userPrompt += `観察者（プレイヤー）から「${userMessage || '今大丈夫？'}」と声をかけられましたが、現在は「${simulatedAction}」の最中で手が離せません。あなたの性格と指定された口調・例文の話し方を厳守し、体言止めを使わずに自然な日本語のみで1〜2文で返答してください。（※英語や中国語など日本語以外の言語・文字は絶対に混ぜないでください）`;
-                } else {
-                    userPrompt += `観察者（プレイヤー）から「${userMessage || '調子はどう？'}」と声をかけられました。現在の季節（${state.season}）や行動（${simulatedAction}）、あなたの性格を踏まえ、指定された口調・例文の話し方で文末までしっかり言い切る形で、自然な日本語のみで1〜2文で返答してください。（※英語や中国語など日本語以外の言語・文字は絶対に混ぜないでください）`;
-                }
-            } else {
-                userPrompt += `現在、季節は「${state.season}」で、あなたは「${simulatedAction}」をしています。あなたの性格が滲み出るような思考や感想を、指定された一人称・口調・例文の話し方を厳守して自然な日本語のみで1〜2文で話してください。独り言であっても決して体言止めや常体に崩さず、指定の語尾で文末まで完全に言い切ってください。（※英語や中国語など日本語以外の言語・文字は絶対に混ぜないでください）`;
+            let intentDirective = '';
+            if (talkIntent === 'request_pat') {
+                intentDirective = '観察者（プレイヤー）から「頭を撫でてほしい／労ってほしい」とお願いされました。主語を間違えず、あなたの性格・口調・関係性に応じて、照れながら応じる・呆れつつ優しく手を伸ばす・不器用ながら頭を撫でてあげるなど、キャラクターらしい反応をしてください。';
+            } else if (talkIntent === 'give_pat') {
+                intentDirective = '観察者（プレイヤー）があなたの頭をそっと撫でてきました。主語を間違えず、あなたの性格・口調・関係性に応じて、一瞬驚いて固まる・むすっとしつつも大人しく撫でられる・嬉しそうに目を細めるなど、キャラクターらしい反応をしてください。';
+            } else if (talkIntent === 'meal_share') {
+                intentDirective = state.actionType === 'meal'
+                    ? '現在あなたは食事・休憩中です。観察者（プレイヤー）から「一口ちょうだい／分けてほしい」と声をかけられました。あなたの性格や口調らしく、呆れつつ一口分けてあげる・照れながら差し出す・自分の分だからと軽くたしなめつつも少し譲るなど、食事の場面に合った自然な返答をしてください。'
+                    : '観察者（プレイヤー）から「一口ちょうだい／分けてほしい」と声をかけられました。手元のお茶やお菓子を差し出したり、「今は食事中ではないけれど」と軽く返したり、あなたの性格らしく自然に反応してください。';
+            } else if (talkIntent === 'meal_taste') {
+                intentDirective = state.actionType === 'meal'
+                    ? '現在あなたは食事・休憩中です。観察者（プレイヤー）から「おいしい？／何を食べているの？」といった食事についての感想や質問を向けられました。味や香り、食事のひとときの心地よさなどを、あなたの性格・好きなもの・口調に合わせて自然に返答してください。'
+                    : '観察者（プレイヤー）から食べ物や味についての話題を向けられました。現在の行動やあなたの好きなものを踏まえつつ、口調通りに自然に返答してください。';
+            } else if (talkIntent === 'care_gift') {
+                intentDirective = '観察者（プレイヤー）から温かい労いの言葉や差し入れを受け取りました。あなたの性格・口調らしく、感謝や少し照れた様子、ほっとした気持ちなどを自然に返答してください。';
             }
 
-            const generatedText = await requestLlmGeneration(sysPrompt, userPrompt, abortController);
+            if (type === 'talk_sleep') {
+                const sleepPatNote = talkIntent === 'give_pat'
+                    ? '頭をそっと撫でられた気配に少し安心したような、'
+                    : '';
+                userPrompt += `現在あなたは「就寝中（熟睡している状態）」です。観察者（プレイヤー）からそっと「${userMessage || '様子を見る'}」と働きかけられました。起きてしっかり会話することは絶対にせず、${sleepPatNote}意識がはっきりしないまま夢うつつに漏らす【10〜25文字程度の非常に短い寝言や寝ぼけたうめき声】のみを、あなたの口調のまま自然な日本語で出力してください。（※英語や中国語など日本語以外の言語・文字は絶対に混ぜないでください）`;
+            } else if (type === 'talk') {
+                if (state.actionType === 'work' || state.actionType === 'morning') {
+                    const busyIntentLine = intentDirective ? `\nまた、今回の働きかけの意図は次の通りです：${intentDirective}` : '';
+                    userPrompt += `観察者（プレイヤー）から「${userMessage || '今大丈夫？'}」と声をかけられましたが、あなたは現在「${simulatedAction}」の最中で本来は手が離せません。${busyIntentLine}
+基本的には「今は忙しいから後にしてほしい」と断る立場ですが、あなたの性格・相手との関係性・そして今回かけられた言葉の内容（一言で済む労いや「頭を撫でて」「頭を撫でる」のような短いふれあい等）を踏まえて、「忙しいけれど、そのくらいなら一瞬だけ手を止めて折れてあげてもいいかな」と思えるかどうかをキャラクター自身として判断してください。
+- 折れる場合：作業の手を一瞬だけ止め、呆れや照れ、あるいは優しさを滲ませながら短く応じてください。
+- 断る場合：冷たく突き放すのではなく、あなたの口調らしく「今は手が離せないから後にしてほしい」と伝えてください。
+指定された口調・例文の話し方を厳守し、体言止めを使わずに自然な日本語のみで1〜2文で返答してください。（※英語や中国語など日本語以外の言語・文字は絶対に混ぜないでください）`;
+                } else {
+                    const lateNightNote = isLateNight ? '現在は深夜の静かな時間帯であることも踏まえ、' : '';
+                    const intentLine = intentDirective ? `${intentDirective}\n` : '';
+                    userPrompt += `観察者（プレイヤー）から「${userMessage || '調子はどう？'}」と声をかけられました。\n${intentLine}${lateNightNote}現在の季節（${state.season}）・天気（${weatherName}）や行動（${simulatedAction}）、あなたの性格を踏まえ、指定された口調・例文の話し方で文末までしっかり言い切る形で、自然な日本語のみで1〜2文で返答してください。（※英語や中国語など日本語以外の言語・文字は絶対に混ぜないでください）`;
+                }
+            } else {
+                userPrompt += `現在、季節は「${state.season}」、外の天気は「${weatherName}」で、あなたは「${simulatedAction}」をしています。あなたの性格が滲み出るような思考や感想を、指定された一人称・口調・例文の話し方を厳守して自然な日本語のみで1〜2文で話してください。独り言であっても決して体言止めや常体に崩さず、指定の語尾で文末まで完全に言い切ってください。（※英語や中国語など日本語以外の言語・文字は絶対に混ぜないでください）`;
+            }
+
+            const genResult = await requestLlmGeneration(sysPrompt, userPrompt, abortController);
+            const generatedText = genResult ? genResult.text : null;
 
             if (reqId !== currentLlmRequestId) {
                 return { ok: false, reason: 'stale' };
@@ -3341,7 +4019,10 @@ ${profile.tone || '一人称は「私」。自然で落ち着いた口調で話�
             }
 
             if (generatedText && generatedText.length > 0) {
-                if (!isTest || state.actionType !== 'sleep') {
+                if (type === 'talk_sleep') {
+                    const cleanedSleepGen = generatedText.replace(/^[…\.・]+/, '').trim() || generatedText;
+                    state.currentSpeech = `「…${cleanedSleepGen}」\n（${profile.name || '住人'}は寝ぼけているのか小さくつぶやいたが、すぐまた静かな寝息を立て始めた）`;
+                } else if (!isTest || state.actionType !== 'sleep') {
                     state.currentSpeech = `「${generatedText}」`;
                 }
                 if (getActiveChar().profile.id === targetCharId) {
@@ -3353,7 +4034,11 @@ ${profile.tone || '一人称は「私」。自然で落ち着いた口調で話�
                 if (getActiveChar().profile.id === targetCharId) {
                     renderAll();
                 }
-                return { ok: false, reason: 'api_error' };
+                return {
+                    ok: false,
+                    reason: genResult?.errorReason || 'api_error',
+                    errorMessage: genResult?.errorMessage || ''
+                };
             }
         } catch (err) {
             if (reqId === currentLlmRequestId) {
@@ -3362,7 +4047,7 @@ ${profile.tone || '一人称は「私」。自然で落ち着いた口調で話�
                     renderAll();
                 }
             }
-            return { ok: false, reason: 'exception' };
+            return { ok: false, reason: 'exception', errorMessage: '⚠️ AI生成処理中に予期せぬエラーが発生しました' };
         } finally {
             if (reqId === currentLlmRequestId) {
                 isGeneratingLLM = false;
@@ -3461,65 +4146,235 @@ ${profile.tone || '一人称は「私」。自然で落ち着いた口調で話�
         state.lastTalkedTimeKey = currentTimeKey;
 
         const trimmed = (inputMessage || '').trim();
+        const talkIntent = detectTalkIntent(trimmed, state.actionType);
         const likes = (profile.likes && profile.likes.length > 0) ? profile.likes : ['お茶'];
         const fav = likes[Math.floor(Math.random() * likes.length)];
+        const favWith = formatFavoritePhrase(fav, 'with');
+        const isLateNight = (state.hour >= 22 || state.hour <= 4);
+        const isUsingLlm = (llmConfig.provider !== 'offline');
 
         if (trimmed === '邪魔しないように見守る') {
-            state.currentSpeech = `（視線に気づいて少しこちらを見たあと、${name}は穏やかに微笑んで元の作業に戻った）`;
-            upsertDailyMemory(
-                charObj,
-                `${state.currentAction}の間、誰かに静かに見守られていた気がする。穏やかな一日だった。`,
-                true
-            );
+            if (state.actionType === 'sleep') {
+                state.currentSpeech = `（静かな寝息を立てている${name}を起こさないよう、毛布の端をそっと直して見守った）`;
+                upsertDailyMemory(
+                    charObj,
+                    `夜は穏やかに深く眠りについた。誰かがそばで優しく見守ってくれていた気がする。`,
+                    true
+                );
+            } else {
+                state.currentSpeech = `（視線に気づいて少しこちらを見たあと、${name}は穏やかに微笑んで元の作業に戻った）`;
+                upsertDailyMemory(
+                    charObj,
+                    `${state.currentAction}の間、誰かに静かに見守られていた気がする。穏やかな一日だった。`,
+                    true
+                );
+            }
             saveStorage();
             renderAll();
         } else if (state.actionType === 'sleep') {
-            state.currentSpeech = `（${name}は深く眠っているようだ。そっとしておこう）`;
-            upsertDailyMemory(
-                charObj,
-                `静かに深く眠りについた。誰かが様子を見に来てくれた気配がした。`,
-                true
-            );
-            saveStorage();
-            renderAll();
-        } else if (state.actionType === 'work' || state.actionType === 'morning') {
-            const busySample = pickContextualSample(profile, state, 'talk_busy');
-            if (busySample) {
-                state.currentSpeech = `「${busySample}」\n（${name}は現在「${state.currentAction}」で手が離せないようだ）`;
+            // 就寝中は「完全に眠っていて話さない（熟睡）」と「半分寝ぼけた短い寝言」の2パターンに分岐
+            const isDeepMidnight = (state.hour >= 0 && state.hour <= 4);
+            const silentProbability = isDeepMidnight ? 0.58 : 0.50;
+            const isSilentDeepSleep = Math.random() < silentProbability;
+
+            if (isSilentDeepSleep) {
+                if (talkIntent === 'give_pat') {
+                    state.currentSpeech = `（深く眠っている${name}の頭をそっと撫でた。目を覚ます気配はないが、規則正しい寝息が少しだけ穏やかになったように見えた）`;
+                    upsertDailyMemory(
+                        charObj,
+                        `深く眠りについていた。夢の中で誰かにそっと頭を撫でられたような温もりがあった気がする。`,
+                        true
+                    );
+                } else {
+                    const silentNarrations = [
+                        `（${name}は深く眠っていて、声をかけても反応がない。規則正しい寝息だけが聞こえる）`,
+                        `（静まり返った部屋に${name}の寝息だけが響いている。起こすのはやめてそっとしておこう）`,
+                        `（${name}は毛布にくるまってぐっすり眠っている。返事は返ってこなかった）`
+                    ];
+                    state.currentSpeech = silentNarrations[Math.floor(Math.random() * silentNarrations.length)];
+                    upsertDailyMemory(
+                        charObj,
+                        `朝まで目を覚ますことなく、静かにぐっすりと眠りについた。`,
+                        true
+                    );
+                }
+                // 熟睡パターンではLLMを呼ばず眠りを尊重する
+                saveStorage();
+                renderAll();
             } else {
-                state.currentSpeech = `（${name}は現在「${state.currentAction}」で手が離せないようだ。落ち着いたらまた後で声をかけよう）`;
+                const sleepSample = pickContextualSample(profile, state, 'talk_sleep', true);
+                if (sleepSample) {
+                    const cleanedSleepSample = sleepSample.replace(/^[…\.・]+/, '').trim() || sleepSample;
+                    const sleepSuffix = talkIntent === 'give_pat'
+                        ? `（頭を撫でられた${name}は寝ぼけたように小さくつぶやいたが、すぐまた静かな寝息を立て始めた）`
+                        : `（${name}は寝ぼけているのか小さくつぶやいたが、すぐまた眠りに落ちてしまった）`;
+                    state.currentSpeech = `「…${cleanedSleepSample}」\n${sleepSuffix}`;
+                } else if (talkIntent === 'give_pat') {
+                    state.currentSpeech = `（頭をそっと撫でられ、${name}は寝ぼけたまま小さく身じろぎして何かむにゃむにゃとつぶやいたが、すぐまた眠りに落ちてしまった）`;
+                } else {
+                    const halfAsleepNarrations = [
+                        `（${name}は寝ぼけているのか、小さく身じろぎして何かむにゃむにゃとつぶやいたが、すぐまた眠りに落ちてしまった）`,
+                        `（声をかけると、${name}は半分寝ぼけたようにわずかに眉を動かして寝返りを打ったが、そのまま深い眠りに戻った）`
+                    ];
+                    state.currentSpeech = halfAsleepNarrations[Math.floor(Math.random() * halfAsleepNarrations.length)];
+                }
+
+                upsertDailyMemory(
+                    charObj,
+                    `ぐっすり眠っていた。夢うつつの中で、誰かにそっと声をかけられたような気配がした。`,
+                    true
+                );
+                saveStorage();
+                renderAll();
+
+                const res = await updateSpeechWithLLM(charObj, 'talk_sleep', trimmed || '様子を見る', { talkIntent });
+                if (res.ok) {
+                    saveStorage();
+                    renderAll();
+                }
             }
-            upsertDailyMemory(
-                charObj,
-                `${state.currentAction}に声をかけられたが、手が離せず後にしてもらった。`,
-                true
-            );
+        } else if (state.actionType === 'work' || state.actionType === 'morning') {
+            // 昼間の多忙時：オフライン時は短いふれあい・労いなら一瞬だけ折れて応じ、LLM時は「そのくらいなら折れるかな」と思考させる
+            if (talkIntent === 'request_pat') {
+                const patSample = pickContextualSample(profile, state, 'talk_request_pat', true);
+                const narration = `（${name}は「${state.currentAction}」の手をほんの一瞬だけ止め、少し呆れたように息をつきつつも、そっと手を伸ばして頭を撫でてくれた）`;
+                state.currentSpeech = patSample ? `「${patSample}」\n${narration}` : narration;
+                upsertDailyMemory(
+                    charObj,
+                    `忙しい合間だったが、頼まれてほんの少しだけ手を止め、頭を撫でて応じた。`,
+                    true
+                );
+            } else if (talkIntent === 'give_pat') {
+                const patSample = pickContextualSample(profile, state, 'talk_give_pat', true);
+                const narration = `（${state.currentAction}の最中だったが、そっと伸ばされた手のひらに${name}は一瞬だけ動きを止め、少し照れくさそうに受け入れたあと再び作業へ戻った）`;
+                state.currentSpeech = patSample ? `「${patSample}」\n${narration}` : narration;
+                upsertDailyMemory(
+                    charObj,
+                    `${state.currentAction}の途中にそっと頭を撫でられ、ほんの一瞬だけ肩の力が抜けた。`,
+                    true
+                );
+            } else if (talkIntent === 'care_gift') {
+                const careSample = pickContextualSample(profile, state, 'talk_care_gift', true);
+                const narration = `（${name}は「${state.currentAction}」の手をほんの一瞬だけ止め、温かい気遣いに少し表情を和らげて短く応じてくれた）`;
+                state.currentSpeech = careSample ? `「${careSample}」\n${narration}` : narration;
+                upsertDailyMemory(
+                    charObj,
+                    `${state.currentAction}で忙しい最中だったが、温かい気遣いに少し表情を和らげた。`,
+                    true
+                );
+            } else {
+                const busySample = pickContextualSample(profile, state, 'talk_busy');
+                if (busySample) {
+                    state.currentSpeech = `「${busySample}」\n（${name}は現在「${state.currentAction}」で手が離せないようだ）`;
+                } else {
+                    state.currentSpeech = `（${name}は現在「${state.currentAction}」で手が離せないようだ。落ち着いたらまた後で声をかけよう）`;
+                }
+                upsertDailyMemory(
+                    charObj,
+                    isUsingLlm
+                        ? `${state.currentAction}の最中に声をかけられ、忙しい合間に短い言葉を交わした。`
+                        : `${state.currentAction}に声をかけられたが、手が離せず後にしてもらった。`,
+                    true
+                );
+            }
+
             saveStorage();
             renderAll();
 
-            const res = await updateSpeechWithLLM(charObj, 'talk', trimmed || '今ちょっといい？');
+            const res = await updateSpeechWithLLM(charObj, 'talk', trimmed || '今ちょっといい？', { talkIntent });
             if (res.ok) {
                 saveStorage();
                 renderAll();
             }
         } else {
             const actLabel = state.actionType === 'meal' ? '食事・休憩' : (state.currentHobby || '休息');
-            const freeSample = pickContextualSample(profile, state, 'talk_free');
-            if (freeSample) {
-                state.currentSpeech = `「${freeSample}」\n（${actLabel}の手を少し休めて、こちらの声かけに穏やかに応じている）`;
+            const timeScene = isLateNight ? '静まり返った夜更けの部屋で、' : '';
+
+            if (talkIntent === 'request_pat') {
+                const patSample = pickContextualSample(profile, state, 'talk_request_pat', true);
+                const narration = `（少し驚いたように目を丸くしたあと、${name}は少し照れくさそうに手を伸ばし、そっと頭を撫でてくれた）`;
+                state.currentSpeech = patSample ? `「${patSample}」\n${narration}` : narration;
+                upsertDailyMemory(
+                    charObj,
+                    `${actLabel}の合間に頼まれ、少し照れくさそうにそっと頭を撫でてあげた。`,
+                    true
+                );
+            } else if (talkIntent === 'give_pat') {
+                const patSample = pickContextualSample(profile, state, 'talk_give_pat', true);
+                const narration = `（そっと伸ばした手のひらに、${name}は一瞬驚いた様子を見せたものの、嫌がる素振りはなく静かに受け入れている）`;
+                state.currentSpeech = patSample ? `「${patSample}」\n${narration}` : narration;
+                upsertDailyMemory(
+                    charObj,
+                    `静かに頭を撫でられ、少し驚いた様子を見せつつも穏やかに受け入れていた。`,
+                    true
+                );
+            } else if (talkIntent === 'meal_share') {
+                const shareSample = pickContextualSample(profile, state, 'talk_meal_share', true);
+                if (state.actionType === 'meal') {
+                    const narration = `（${name}は少し驚いたようにこちらを見たあと、小さく笑って「一口だけ」と言わんばかりに食事を少し分けてくれた）`;
+                    state.currentSpeech = shareSample ? `「${shareSample}」\n${narration}` : narration;
+                    upsertDailyMemory(
+                        charObj,
+                        `食事の途中、「一口ちょうだい」とねだられて少しだけおすそ分けした。`,
+                        true
+                    );
+                } else {
+                    const narration = `（今は食事の時間ではないが、${name}は手元の${fav}を気にかけて少し分けてくれようとしているようだ）`;
+                    state.currentSpeech = shareSample ? `「${shareSample}」\n${narration}` : narration;
+                    upsertDailyMemory(
+                        charObj,
+                        `${actLabel}の合間に、ちょっとしたおすそ分けのやり取りをして和やかに過ごした。`,
+                        true
+                    );
+                }
+            } else if (talkIntent === 'meal_taste') {
+                const tasteSample = pickContextualSample(profile, state, 'talk_meal_taste', true);
+                if (state.actionType === 'meal') {
+                    const narration = `（食事の感想を尋ねると、${name}は満足そうに頷き、ゆっくりと味わうようにひと口運んだ）`;
+                    state.currentSpeech = tasteSample ? `「${tasteSample}」\n${narration}` : narration;
+                    upsertDailyMemory(
+                        charObj,
+                        `食事のひとときに味の感想を聞かれ、満足そうに頷きながら美味しくいただいた。`,
+                        true
+                    );
+                } else {
+                    const freeSample = tasteSample || pickContextualSample(profile, state, 'talk_free');
+                    state.currentSpeech = freeSample
+                        ? `「${freeSample}」\n（${timeScene}${name}は${fav}や食べ物の話に少し表情を緩めて応じている）`
+                        : `（${timeScene}${name}は${fav}の話題に少し表情を緩めて、穏やかに応じてくれた）`;
+                    upsertDailyMemory(
+                        charObj,
+                        `${actLabel}の合間に、食べ物や${fav}の話をして穏やかに過ごした。`,
+                        true
+                    );
+                }
+            } else if (talkIntent === 'care_gift') {
+                const careSample = pickContextualSample(profile, state, 'talk_care_gift', true);
+                const narration = `（${timeScene}温かい気遣いに、${name}は少し表情を和らげてほっと息をついたようだ）`;
+                state.currentSpeech = careSample ? `「${careSample}」\n${narration}` : narration;
+                upsertDailyMemory(
+                    charObj,
+                    `${actLabel}の合間に温かい気遣いを受け、穏やかな気持ちで過ごした。`,
+                    true
+                );
             } else {
-                state.currentSpeech = `（${name}は${actLabel}の手を少し止め、${fav}を片手に穏やかに応じてくれた）`;
+                const freeSample = pickContextualSample(profile, state, 'talk_free');
+                if (freeSample) {
+                    state.currentSpeech = `「${freeSample}」\n（${timeScene}${actLabel}の手を少し休めて、こちらの声かけに穏やかに応じている）`;
+                } else {
+                    state.currentSpeech = `（${timeScene}${name}は${actLabel}の手を少し止め、${favWith}穏やかに応じてくれた）`;
+                }
+                upsertDailyMemory(
+                    charObj,
+                    `${actLabel}の合間に、${fav}や日常のことを少し言葉にして交わした。`,
+                    true
+                );
             }
-            upsertDailyMemory(
-                charObj,
-                `${actLabel}の合間に、${fav}や日常のことを少し言葉にして交わした。`,
-                true
-            );
 
             saveStorage();
             renderAll();
 
-            const res = await updateSpeechWithLLM(charObj, 'talk', trimmed || '調子はどう？');
+            const res = await updateSpeechWithLLM(charObj, 'talk', trimmed || '調子はどう？', { talkIntent });
             if (res.ok) {
                 saveStorage();
                 renderAll();
@@ -3600,6 +4455,100 @@ ${profile.tone || '一人称は「私」。自然で落ち着いた口調で話�
         });
     }
 
+    function updateWorldSummaryUIFromInputs() {
+        const seasons = Array.from(document.querySelectorAll('input[name="chkWorldSeason"]:checked')).map(c => c.value);
+        const weathers = Array.from(document.querySelectorAll('input[name="chkWorldWeather"]:checked')).map(c => c.value);
+        const worldObj = { seasons, weathers };
+
+        const labelEl = document.getElementById('uiWorldSummaryLabel');
+        if (labelEl) {
+            labelEl.textContent = formatWorldSummaryText(worldObj);
+        }
+
+        const matchedKey = detectMatchingWorldPresetKey(worldObj);
+        document.querySelectorAll('[data-world-preset]').forEach(btn => {
+            if (btn.getAttribute('data-world-preset') === matchedKey) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+    }
+
+    function readFriendsFromInputs() {
+        const rows = document.querySelectorAll('#uiFriendsListContainer .friend-item-row');
+        const list = [];
+        rows.forEach(row => {
+            const nameInp = row.querySelector('.inp-friend-name');
+            const relInp = row.querySelector('.inp-friend-relation');
+            const nameVal = nameInp ? nameInp.value.trim() : '';
+            const relVal = relInp ? relInp.value.trim() : '';
+            if (nameVal) {
+                list.push({ name: nameVal, relation: relVal });
+            }
+        });
+        return list.slice(0, MAX_FRIENDS_COUNT);
+    }
+
+    function updateFriendsSummaryUIFromInputs() {
+        const list = readFriendsFromInputs();
+        const labelEl = document.getElementById('uiFriendsSummaryLabel');
+        if (labelEl) {
+            labelEl.textContent = formatFriendsSummaryText(list);
+        }
+        const addBtn = document.getElementById('btnAddFriendRow');
+        const currentRows = document.querySelectorAll('#uiFriendsListContainer .friend-item-row').length;
+        if (addBtn) {
+            addBtn.disabled = currentRows >= MAX_FRIENDS_COUNT;
+        }
+    }
+
+    function addFriendRowToUI(friendName = '', friendRelation = '') {
+        const container = document.getElementById('uiFriendsListContainer');
+        if (!container) return;
+        const currentRows = container.querySelectorAll('.friend-item-row').length;
+        if (currentRows >= MAX_FRIENDS_COUNT) {
+            showToast(`友人・知人は最大${MAX_FRIENDS_COUNT}人まで登録できます`);
+            return;
+        }
+
+        const row = document.createElement('div');
+        row.className = 'friend-item-row';
+
+        const inpName = document.createElement('input');
+        inpName.type = 'text';
+        inpName.className = 'inp-friend-name';
+        inpName.placeholder = '名前（例：リリア）';
+        inpName.value = friendName;
+        inpName.style.cssText = 'font-family:inherit; font-size:0.88rem; padding:6px 9px; border:1px solid var(--border-color); border-radius:6px; background-color:#fdfcf9; color:var(--text-color);';
+
+        const inpRel = document.createElement('input');
+        inpRel.type = 'text';
+        inpRel.className = 'inp-friend-relation';
+        inpRel.placeholder = '関係・特徴（例：同じ学院の親友。よく一緒にお茶をする）';
+        inpRel.value = friendRelation;
+        inpRel.style.cssText = 'font-family:inherit; font-size:0.88rem; padding:6px 9px; border:1px solid var(--border-color); border-radius:6px; background-color:#fdfcf9; color:var(--text-color);';
+
+        const btnRemove = document.createElement('button');
+        btnRemove.type = 'button';
+        btnRemove.className = 'friend-remove-btn';
+        btnRemove.textContent = '✕';
+        btnRemove.title = 'この友人を削除';
+
+        inpName.addEventListener('input', updateFriendsSummaryUIFromInputs);
+        inpRel.addEventListener('input', updateFriendsSummaryUIFromInputs);
+        btnRemove.addEventListener('click', () => {
+            row.remove();
+            updateFriendsSummaryUIFromInputs();
+        });
+
+        row.appendChild(inpName);
+        row.appendChild(inpRel);
+        row.appendChild(btnRemove);
+        container.appendChild(row);
+        updateFriendsSummaryUIFromInputs();
+    }
+
     function updateScheduleHintFromSelects() {
         const wakeRaw = document.getElementById('selWake').value;
         const sleepRaw = document.getElementById('selSleep').value;
@@ -3666,12 +4615,52 @@ ${profile.tone || '一人称は「私」。自然で落ち着いた口調で話�
             mealToggleBtn.textContent = '🍽️ 食事・休憩のこだわり設定を開く ▼';
         }
 
+        const world = profile.worldSettings || { seasons: ['春', '夏', '秋', '冬'], weathers: ['晴れ', '曇り', '雨', '雪'] };
+        const wSeasons = Array.isArray(world.seasons) && world.seasons.length > 0 ? world.seasons : SEASONS_ALL;
+        const wWeathers = Array.isArray(world.weathers) && world.weathers.length > 0 ? world.weathers : ['晴れ', '曇り', '雨', '雪'];
+        document.querySelectorAll('input[name="chkWorldSeason"]').forEach(chk => {
+            chk.checked = wSeasons.includes(chk.value);
+        });
+        document.querySelectorAll('input[name="chkWorldWeather"]').forEach(chk => {
+            chk.checked = wWeathers.includes(chk.value);
+        });
+        updateWorldSummaryUIFromInputs();
+
+        const worldAdvBox = document.getElementById('uiWorldAdvancedBox');
+        const worldToggleBtn = document.getElementById('btnToggleWorldBox');
+        const isCustomWorld = detectMatchingWorldPresetKey(world) !== 'standard';
+        if (isCustomWorld) {
+            worldAdvBox.classList.add('active');
+            worldToggleBtn.textContent = '🌍 季節・天気の世界観設定を閉じる ▲';
+        } else {
+            worldAdvBox.classList.remove('active');
+            worldToggleBtn.textContent = '🌍 季節・天気の世界観設定を開く ▼';
+        }
+
         document.getElementById('inpSummary').value = profile.summary || '';
         document.getElementById('selSpeechPreset').value = '';
         document.getElementById('inpTone').value = profile.tone || '';
         document.getElementById('inpSpeechSamples').value = (profile.speechSamples || []).join('\n');
         document.getElementById('inpLikes').value = (profile.likes || []).join(', ');
         document.getElementById('inpDislikes').value = (profile.dislikes || []).join(', ');
+
+        const friendsContainer = document.getElementById('uiFriendsListContainer');
+        friendsContainer.innerHTML = '';
+        const friendsList = Array.isArray(profile.friends) ? profile.friends : [];
+        friendsList.forEach(f => {
+            if (f && f.name) addFriendRowToUI(f.name, f.relation || '');
+        });
+        updateFriendsSummaryUIFromInputs();
+
+        const friendsAdvBox = document.getElementById('uiFriendsAdvancedBox');
+        const friendsToggleBtn = document.getElementById('btnToggleFriendsBox');
+        if (friendsList.length > 0) {
+            friendsAdvBox.classList.add('active');
+            friendsToggleBtn.textContent = '🤝 友人・知人の設定を閉じる ▲';
+        } else {
+            friendsAdvBox.classList.remove('active');
+            friendsToggleBtn.textContent = '🤝 友人・知人の設定を開く ▼';
+        }
 
         tempFaceData = profile.faceImageData || '';
         tempRoomData = profile.roomImageData || '';
@@ -3730,6 +4719,71 @@ ${profile.tone || '一人称は「私」。自然で落ち着いた口調で話�
     document.getElementById('chkMealBreakfast').addEventListener('change', updateMealSummaryUIFromInputs);
     document.getElementById('chkMealDinner').addEventListener('change', updateMealSummaryUIFromInputs);
     document.getElementById('selMealBreak').addEventListener('change', updateMealSummaryUIFromInputs);
+
+    document.getElementById('btnToggleWorldBox').addEventListener('click', () => {
+        const worldAdvBox = document.getElementById('uiWorldAdvancedBox');
+        const worldToggleBtn = document.getElementById('btnToggleWorldBox');
+        const isOpen = worldAdvBox.classList.toggle('active');
+        worldToggleBtn.textContent = isOpen
+            ? '🌍 季節・天気の世界観設定を閉じる ▲'
+            : '🌍 季節・天気の世界観設定を開く ▼';
+    });
+
+    document.querySelectorAll('[data-world-preset]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const key = btn.getAttribute('data-world-preset');
+            const preset = WORLD_PRESETS[key];
+            if (!preset) return;
+            document.querySelectorAll('input[name="chkWorldSeason"]').forEach(chk => {
+                chk.checked = preset.seasons.includes(chk.value);
+            });
+            document.querySelectorAll('input[name="chkWorldWeather"]').forEach(chk => {
+                chk.checked = preset.weathers.includes(chk.value);
+            });
+            updateWorldSummaryUIFromInputs();
+            showToast(`世界観プリセット「${preset.label}」を反映しました`);
+        });
+    });
+
+    document.querySelectorAll('input[name="chkWorldSeason"]').forEach(chk => {
+        chk.addEventListener('change', (e) => {
+            const checkedCount = document.querySelectorAll('input[name="chkWorldSeason"]:checked').length;
+            if (checkedCount === 0) {
+                e.target.checked = true;
+                showToast('存在する季節は最低1つ選択してください');
+                return;
+            }
+            updateWorldSummaryUIFromInputs();
+        });
+    });
+
+    document.querySelectorAll('input[name="chkWorldWeather"]').forEach(chk => {
+        chk.addEventListener('change', (e) => {
+            const checkedCount = document.querySelectorAll('input[name="chkWorldWeather"]:checked').length;
+            if (checkedCount === 0) {
+                e.target.checked = true;
+                showToast('発生する天気は最低1つ選択してください');
+                return;
+            }
+            updateWorldSummaryUIFromInputs();
+        });
+    });
+
+    document.getElementById('btnToggleFriendsBox').addEventListener('click', () => {
+        const friendsAdvBox = document.getElementById('uiFriendsAdvancedBox');
+        const friendsToggleBtn = document.getElementById('btnToggleFriendsBox');
+        const isOpen = friendsAdvBox.classList.toggle('active');
+        friendsToggleBtn.textContent = isOpen
+            ? '🤝 友人・知人の設定を閉じる ▲'
+            : '🤝 友人・知人の設定を開く ▼';
+        if (isOpen && document.querySelectorAll('#uiFriendsListContainer .friend-item-row').length === 0) {
+            addFriendRowToUI('', '');
+        }
+    });
+
+    document.getElementById('btnAddFriendRow').addEventListener('click', () => {
+        addFriendRowToUI('', '');
+    });
 
     document.getElementById('btnHolidayWeekend').addEventListener('click', () => {
         document.querySelectorAll('input[name="chkHoliday"]').forEach(chk => {
@@ -3991,6 +5045,24 @@ ${profile.tone || '一人称は「私」。自然で落ち着いた口調で話�
             dinner: mealDinner
         };
 
+        const selectedSeasons = Array.from(document.querySelectorAll('input[name="chkWorldSeason"]:checked'))
+            .map(chk => chk.value)
+            .filter(s => SEASONS_ALL.includes(s));
+        const selectedWeathers = Array.from(document.querySelectorAll('input[name="chkWorldWeather"]:checked'))
+            .map(chk => chk.value)
+            .filter(w => WEATHERS_ALL.includes(w));
+        profile.worldSettings = {
+            seasons: selectedSeasons.length > 0 ? selectedSeasons : ['春', '夏', '秋', '冬'],
+            weathers: selectedWeathers.length > 0 ? selectedWeathers : ['晴れ', '曇り', '雨', '雪']
+        };
+
+        state.season = resolveSeasonForWorld(state.month, profile.worldSettings);
+        if (!profile.worldSettings.weathers.includes(state.weather)) {
+            state.weather = drawWeatherForWorld(state.season, profile.worldSettings);
+        }
+
+        profile.friends = readFriendsFromInputs();
+
         profile.summary = document.getElementById('inpSummary').value.trim();
         profile.tone = document.getElementById('inpTone').value.trim();
         profile.speechSamples = document.getElementById('inpSpeechSamples').value
@@ -4244,7 +5316,7 @@ ${profile.tone || '一人称は「私」。自然で落ち着いた口調で話�
                 ? `✅ 接続・生成成功（現在就寝中のためテスト結果のみ表示）: ${res.text}`
                 : `✅ 生成成功: ${res.text}`;
         } else {
-            statusEl.textContent = '⚠️ 生成に失敗したためフォールバック表示を維持しました（APIキー・URL・モデル名・CORS設定をご確認ください）';
+            statusEl.textContent = res.errorMessage || '⚠️ 生成に失敗したためフォールバック表示を維持しました（APIキー・URL・モデル名・CORS設定をご確認ください）';
         }
     });
 
